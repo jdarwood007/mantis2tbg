@@ -296,6 +296,35 @@ class mbt_to_tbg
 	{
 		$substep = $this->getSubStep(__FUNCTION__);
 
+		// Obtain any current builds.
+		$query = '
+			SELECT
+				id, name
+				FROM ' . $this->mbt_db_prefix . 'builds';
+		$builds = array();
+		foreach ($this->db->query($sql) as $row)
+			$builds[$row['name']] = $row['id'];
+
+		$query = '
+			SELECT
+				id, project_id, version, released AS isreleased
+				FROM ' . $this->mbt_db_prefix . 'project_version_table
+			LIMIT ' . $substep . ' 500';
+
+		foreach ($this->db->query($sql) as $row)
+		{
+			if (isset($builds[$version]))
+				continue;
+
+			$this->db->query('
+				INSERT INTO (' . $this->tbg_db_prefix . 'builds (name) VALUES (' . $row['version'] . ')');
+
+			$builds[$row['version']] = $this->db->lastInsertId();
+
+		}
+
+		$this->updateSubStep($substep + 500);
+		$this->checkTimeout(__FUNCTION__);
 	}
 
 
@@ -306,6 +335,15 @@ class mbt_to_tbg
 	function doStep5()
 	{
 		$substep = $this->getSubStep(__FUNCTION__);
+
+		// Obtain any current builds.
+		$query = '
+			SELECT
+				id, name
+				FROM ' . $this->mbt_db_prefix . 'builds';
+		$builds = array();
+		foreach ($this->db->query($sql) as $row)
+			$builds[$row['name']] = $row['id'];
 
 		$query = '
 			SELECT
@@ -331,12 +369,18 @@ class mbt_to_tbg
 				INSERT INTO ' . $this->tbg_db_prefix . 'issues (id, project_id, title, assigned_to, duplicate_of, posted, last_updated, state, category, resolution, priority, severity, reproducability)
 				VALUES (' . $row['id'] . ', ' . $row['project_id'] . ', "' . $row['title'] . '", ' . $row['assigned_to'] . ', ' . $row['duplicate_of'] . ', ' . $row['posted'] . ', ' . $row['last_updated'] . ', ' . $row['state'] . ', ' . $row['category'] . ', ' . $row['category'] . ', ' . $row['resolution'] . ', ' . $row['priority'] . ', ' . $row['severity'] . ', ' . $row['reproducability'] . ')');
 
-			// @ TODO: Make this detect duplicates.
-			$this->db->query('
-				INSERT INTO (' . $this->tbg_db_prefix . 'builds (name) VALUES (' . $row['version'] . ')');
+			if (!isset(builds[$row['version']]))
+			{
+				$this->db->query('
+					INSERT INTO (' . $this->tbg_db_prefix . 'builds (name) VALUES (' . $row['version'] . ')');
+
+				$builds[$row['version']] = $this->db->lastInsertId();	
+			}
+
+			$affect_id = $builds[$row['version']];
 
 			$this->db->query('
-				INSERT INTO (' . $this->tbg_db_prefix . 'issueaffectsbuild (id, build) VALUES(' . $row['id'] . ', ' . $this->db->lastInsertId() . ')');
+				INSERT INTO (' . $this->tbg_db_prefix . 'issueaffectsbuild (id, build) VALUES(' . $row['id'] . ', ' . $affect_id . ')');
 		}
 
 		$this->updateSubStep($substep + 500);
@@ -349,6 +393,23 @@ class mbt_to_tbg
 	*/
 	function doStep6()
 	{
+		$substep = $this->getSubStep(__FUNCTION__);
+
+		$query = '
+			SELECT
+				bn.id, bn.bug_id AS target_id, bn.last_modified AS updated, bn.date_submitted AS posted,
+				bn.reporter_id AS updated_by, bn.reporter_id AS posted_by, bnt.note AS content
+				FROM ' . $this->mbt_db_prefix . 'bugnote_table AS bn
+					INNER JOIN ' . $this->mbt_db_prefix . 'butnote_text_table AS bnt ON (bn.id = bnt.bug_text_id)
+			LIMIT ' . $substep . ' 500';
+
+		foreach ($this->db->query($sql) as $row)
+			$this->db->query('
+				INSERT INTO ' . $this->tbg_db_prefix . 'comments (id, target_id, updated, posted, updated_by, posted_by, content)
+				VALUES (' . $row['id'] . ', ' . $row['target_id'] . ', ' . $row['updated'] . ', ' . $row['posted'] . ', ' . $row['updated_by'] . ', ' . $row['posted_by'] . ', "' . $row['content'] . '")');
+
+		$this->updateSubStep($substep + 500);
+		$this->checkTimeout(__FUNCTION__);
 	}
 }
 
