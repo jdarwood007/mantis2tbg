@@ -225,7 +225,7 @@ class mbt_to_tbg
 				enabled, last_vist AS lastseen, date_created AS joined
 			FROM
 				' . $this->mbt_db_prefix . 'user_table
-			LIMIT ' . $substep . ' 500');
+			LIMIT ' . $substep . ' 500';
 
 		// We could let this save up a few inserts then do them at once, but are we really worried about saving queries here?
 		foreach ($this->db->query($sql) as $row)
@@ -254,7 +254,7 @@ class mbt_to_tbg
 				id, name, description,
 				(CASE WHEN enabled = 0 THEN 1 ELSE 0) AS locked
 				FROM ' . $this->mbt_db_prefix . 'project_table
-			LIMIT ' . $substep . ' 500');
+			LIMIT ' . $substep . ' 500';
 
 		foreach ($this->db->query($sql) as $row)
 			$this->db->query('
@@ -277,7 +277,7 @@ class mbt_to_tbg
 			SELECT
 				name
 				FROM ' . $this->mbt_db_prefix . 'category_table
-			LIMIT ' . $substep . ' 500');
+			LIMIT ' . $substep . ' 500';
 
 		foreach ($this->db->query($sql) as $row)
 			$this->db->query('
@@ -323,7 +323,7 @@ class mbt_to_tbg
 					version
 				FROM ' . $this->mbt_db_prefix . 'bug_table AS bt
 					LEFT JOIN ' . $this->mbt_db_prefix . 'bug_text_table AS btt ON (btt.id = bt.bug_text_id)
-			LIMIT ' . $substep . ' 500');
+			LIMIT ' . $substep . ' 500';
 
 		foreach ($this->db->query($sql) as $row)
 		{
