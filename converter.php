@@ -41,11 +41,20 @@ class mbt_to_tbg
 	protected $mbt_db_prefix;
 	protected $tbg_db_prefix;
 
+	// The start timer.
+	protected $start_time = 0;
+
+	// Is this CLI?
+	protected $is_cli = false;
+
 	// The database connection resource.
 	protected $db;
 
 	function __construct()
 	{
+		// Start your engines.
+		$this->start_time = time();
+
 		// Don't timeout!
 		set_time_limit(0);
 
@@ -152,6 +161,47 @@ class mbt_to_tbg
 	}
 
 	/**
+	*
+	* Updates the current substep
+	*
+	* @param init $substep new value for substep.
+	*/
+	function updateSubStep($substep)
+	{
+		$_GET['substep'] = (int) $substep;
+	}
+
+	/**
+	*
+	* Checks our timeout status and attempts to allow us to work longer.
+	*
+	* @param $function The function name we should return to if we can continue.
+	*/
+	function checkTimeout($function)
+	{
+		// CLI conversions can just continue.
+		if ($this->is_cli)
+		{
+			if (time() - $this->start_time > 1)
+				print (".\r");
+			$this->$function();
+		}
+
+		// Try to buy us more time.
+		@set_time_limit(300);
+		if (function_exists('apache_reset_timeout'))
+			@apache_reset_timeout();
+
+		// if we can pass go, collect $200.
+		if (time() - $this->start_time < 10)
+			$this->$function();
+
+		// @ TODO: Add in timeout stuff here.
+		// @ !!! If this is all done via ajax, it should be a json or xml return.
+		// @ !!! Will need to strip doStep from the function name and cast as a int for security.
+	}
+
+	/**
 	* Empty the tables prior to the conversion.
 	*
 	* @Should it empty the tables prior to conversion or just dump over?
@@ -182,10 +232,13 @@ class mbt_to_tbg
 		{
 			$password = $this->getRandomString();
 
-			$his->db->query('
+			$this->db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'users (id, username, buddyname, realname, email, password, enabled, lastseen, joined)
 				VALUES (' . $row['id'] . ', "' . $row['username'] . '", "' . $row['buddyname'] . '", "' . $row['realname'] . '", "' . $row['email'] . '", "' . $password . '", ' . $row['enabled'] . ', ' . $row['username'] . ', ' . $row['joined'] . ')');
 		}
+
+		$this->updateSubStep($substep + 500);
+		$this->checkTimeout(__FUNCTION__);
 	}
 }
 
