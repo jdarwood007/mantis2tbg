@@ -1,0 +1,61 @@
+Mantis to The Bug Genie converter
+Authors:
+Jeremy D (SleePy) @ simplemachines.org
+groundup
+
+Translation table guide:
+
+Mantis Table	Mantis Column	TBG Table	TBG Column	Notes
+
+user_table	id	tbg3_users	id
+user_table	username	tbg3_users	username, buddyname
+user_table	realname	tbg3_users	realname
+user_table	email	tbg3_users	email
+user_table	password		password	Will send a new password to every user
+user_table	enabled	tbg3_users	enabled
+user_table	protected			Not sure what this is for
+user_table	access_level	tbg3_users		Get the MAX(user_table.access_level) to find who is an administrator. I think >= 90 is an admin - TBG admin group is id 1, otherwise set to 2. zegenie: Could also use the "admingroup" (admins) and "defaultgroup" (users) setting from tbg3_settings
+user_table	last_visit		lastseen
+user_table	date_created		joined
+
+tag_table		Not porting
+
+bug_table	id	issues	id
+bug_table	project_id	issues	project_id
+bug_table	summary	issues	title
+bug_table	handler_id	issues	assigned_to
+bug_table	duplicate_id	issues	duplicate_of
+bug_table	date_submitted	issues	posted
+bug_table	last_updated	issues	last_updated
+bug_table	status	issues	state	Is this open/closed (in tbg open=0 closed=1)
+bug_table	version	issueaffectsbuild	build	builds set below, id of issue in issueaffectsbuild must match in issues table
+bug_table	category_id	issues	category	Category IDs must be altered to match new TBG ones
+bug_table	resolution	issues	resolution
+bug_table	priority	issues	priority	Mantis (none = 10; low = 20; normal = 30; high = 40; urgent = 50; immediate = 60) TBG()
+bug_table	severity	issues	severity	Mantis (feature = 10; trivial = 20; text = 30; tweak = 40; minor = 50; major = 60; crash = 70; block = 80;) TBG (Low = 20; Normal = 21; Critical = 22) Mantis->TBG ()
+bug_table	reproducability	issues	reproducability	Mantis (always = 10; sometimes = 30; random = 50; have not tried = 70; unable to reproduce = 90; N/A = 100) TBG (Always = 12; Often = 11; Rarely = 10; Can't reproduce = 9) Mantis->TBG (10->12, 30->11, 50->10, 90->9, 70->null, 100->null)
+
+bug_text_table	steps_to_reproduce	issues	reproduction_steps	JOIN ON (bug_text_table.id = bug_table.bug_text_id)
+bug_text_table	description	issues	description	JOIN ON (bug_text_table.id = bug_table.bug_text_id)
+
+category_table	name	listtypes	name	set itemtype = category
+
+bug_relationships_table	source_bug_id	issuerelations	parent_id	These two should be swapped around if the opposite relation is true
+bug_relationships_table	destination_bug_id	issuerelations	child_id
+
+bugnote_table	bug_id	comments	target_id	set target_type to 1
+bugnote_table	last_modified	comments	updated
+bugnote_table	date_submitted	comments	posted
+bugnote_table	reporter_id	comments	updated_by
+bugnote_table	reporter_id	comments	posted_by
+bugnote_text_table	note	comments	content
+
+project_table	id	projects	id
+project_table	name	projects	name
+project_table	enabled	projects	locked	invert the val
+project_table	description	projects	description
+
+project_version_table	id	builds	id
+project_version_table	project_id	builds	project
+project_version_table	version	builds		yuck! gonna have to split this over version_major, version_minor and version_revision. Going to need the user to input the format. Use %s and %d as string and decimal places. So, for instance, a normal one would be %d.%d.%d %s (where the %s might be ignored or the "%d %s" becomes the version_revision) - note that all fields are integers AFAIK
+project_version_table	released	builds	isreleased
