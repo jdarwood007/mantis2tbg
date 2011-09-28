@@ -150,11 +150,11 @@ class mbt_to_tbg
 	*
 	* Gets the current substep
 	*
-	* @param init $step The current step we should be on, if this changes substep is ignored and reset
+	* @param string $step The current function we are on.
 	*/
 	function getSubStep($step)
 	{
-		if (!isset($_GET['step']) || !isset($_GET['substep']) || $step != $_GET['step'])
+		if (!isset($_GET['step']) || !isset($_GET['substep']) || str_replace('doStep', '', $step) != $_GET['step'])
 			return 0;
 		else
 			return (int) $_GET['substep'];
@@ -217,7 +217,7 @@ class mbt_to_tbg
 	*/
 	function doStep1()
 	{
-		$substep = $this->getSubStep(1);
+		$substep = $this->getSubStep(__FUNCTION__);
 
 		$query = '
 			SELECT
@@ -239,6 +239,116 @@ class mbt_to_tbg
 
 		$this->updateSubStep($substep + 500);
 		$this->checkTimeout(__FUNCTION__);
+	}
+
+	/**
+	* Convert Projects.
+	*
+	*/
+	function doStep2()
+	{
+		$substep = $this->getSubStep(__FUNCTION__);
+
+		$query = '
+			SELECT
+				id, name, description,
+				(CASE WHEN enabled = 0 THEN 1 ELSE 0) AS locked
+				FROM ' . $this->mbt_db_prefix . 'project_table
+			LIMIT ' . $substep . ' 500');
+
+		foreach ($this->db->query($sql) as $row)
+			$this->db->query('
+				INSERT INTO ' . $this->tbg_db_prefix . 'projects (id, name, locked, description)
+				VALUES (' . $row['id'] . ', "' . $row['name'] . '", ' . $row['locked'] . ', "' . $row['description'] . '")');
+
+		$this->updateSubStep($substep + 500);
+		$this->checkTimeout(__FUNCTION__);
+	}
+
+	/**
+	* Convert Categories.
+	*
+	*/
+	function doStep3()
+	{
+		$substep = $this->getSubStep(__FUNCTION__);
+
+		$query = '
+			SELECT
+				name
+				FROM ' . $this->mbt_db_prefix . 'category_table
+			LIMIT ' . $substep . ' 500');
+
+		foreach ($this->db->query($sql) as $row)
+			$this->db->query('
+				INSERT INTO ' . $this->tbg_db_prefix . 'listtypes (name, itemtype, scope)
+				VALUES (' . $row['name'] . ', "category", 1)');
+
+		$this->updateSubStep($substep + 500);
+		$this->checkTimeout(__FUNCTION__);
+	}
+
+	/**
+	* Convert Versions.
+	*
+	*/
+	function doStep4()
+	{
+		$substep = $this->getSubStep(__FUNCTION__);
+
+	}
+
+
+	/**
+	* Normally we want to fix them, but in this case we want to convert bugs.
+	*
+	*/
+	function doStep5()
+	{
+		$substep = $this->getSubStep(__FUNCTION__);
+
+		$query = '
+			SELECT
+				bt.id, bt.project_id, bt.summary AS title, bt.handler_id AS assigned_to, bt.duplicate_id AS duplicate_of,
+				bt.date_submitted AS posted, bt.last_updated, bt.status AS state, bt.cagegory_id AS category,
+				bt.priority,
+				bt.severity /* NEEDS FIXED */,
+				(CASE
+					WHEN bt.reproducability = 10 THEN 12
+					WHEN bt.reproducability > 30 AND bt.reproducability < 70 THEN 11
+					WHEN bt.reproducability > 70 AND bt.reproducability < 90 THEN 9
+					ELSE 0) AS reproducability,
+					IFNULL(btt.steps_to_reproduce, "") AS reproduction_steps
+					IFNULL(btt.description, "") AS description,
+					version
+				FROM ' . $this->mbt_db_prefix . 'bug_table AS bt
+					LEFT JOIN ' . $this->mbt_db_prefix . 'bug_text_table AS btt ON (btt.id = bt.bug_text_id)
+			LIMIT ' . $substep . ' 500');
+
+		foreach ($this->db->query($sql) as $row)
+		{
+			$this->db->query('
+				INSERT INTO ' . $this->tbg_db_prefix . 'issues (id, project_id, title, assigned_to, duplicate_of, posted, last_updated, state, category, resolution, priority, severity, reproducability)
+				VALUES (' . $row['id'] . ', ' . $row['project_id'] . ', "' . $row['title'] . '", ' . $row['assigned_to'] . ', ' . $row['duplicate_of'] . ', ' . $row['posted'] . ', ' . $row['last_updated'] . ', ' . $row['state'] . ', ' . $row['category'] . ', ' . $row['category'] . ', ' . $row['resolution'] . ', ' . $row['priority'] . ', ' . $row['severity'] . ', ' . $row['reproducability'] . ')');
+
+			// @ TODO: Make this detect duplicates.
+			$this->db->query('
+				INSERT INTO (' . $this->tbg_db_prefix . 'builds (name) VALUES (' . $row['version'] . ')');
+
+			$this->db->query('
+				INSERT INTO (' . $this->tbg_db_prefix . 'issueaffectsbuild (id, build) VALUES(' . $row['id'] . ', ' . $this->db->lastInsertId() . ')');
+		}
+
+		$this->updateSubStep($substep + 500);
+		$this->checkTimeout(__FUNCTION__);
+	}
+
+	/**
+	* Bug Notes.
+	*
+	*/
+	function doStep6()
+	{
 	}
 }
 
