@@ -217,6 +217,7 @@ class mbt_to_tbg
 	*/
 	function doStep1()
 	{
+		$step_size = 500;
 		$substep = $this->getSubStep(__FUNCTION__);
 
 		$query = '
@@ -225,7 +226,7 @@ class mbt_to_tbg
 				enabled, last_vist AS lastseen, date_created AS joined
 			FROM
 				' . $this->mbt_db_prefix . 'user_table
-			LIMIT ' . $substep . ' 500';
+			LIMIT ' . $substep . ' ' . $step_size;
 
 		// We could let this save up a few inserts then do them at once, but are we really worried about saving queries here?
 		foreach ($this->db->query($sql) as $row)
@@ -237,7 +238,7 @@ class mbt_to_tbg
 				VALUES (' . $row['id'] . ', "' . $row['username'] . '", "' . $row['buddyname'] . '", "' . $row['realname'] . '", "' . $row['email'] . '", "' . $password . '", ' . $row['enabled'] . ', ' . $row['username'] . ', ' . $row['joined'] . ')');
 		}
 
-		$this->updateSubStep($substep + 500);
+		$this->updateSubStep($substep + $step_size);
 		$this->checkTimeout(__FUNCTION__);
 	}
 
@@ -247,6 +248,7 @@ class mbt_to_tbg
 	*/
 	function doStep2()
 	{
+		$step_size = 500;
 		$substep = $this->getSubStep(__FUNCTION__);
 
 		$query = '
@@ -254,14 +256,14 @@ class mbt_to_tbg
 				id, name, description,
 				(CASE WHEN enabled = 0 THEN 1 ELSE 0) AS locked
 				FROM ' . $this->mbt_db_prefix . 'project_table
-			LIMIT ' . $substep . ' 500';
+			LIMIT ' . $substep . ' ' . $step_size;
 
 		foreach ($this->db->query($sql) as $row)
 			$this->db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'projects (id, name, locked, description)
 				VALUES (' . $row['id'] . ', "' . $row['name'] . '", ' . $row['locked'] . ', "' . $row['description'] . '")');
 
-		$this->updateSubStep($substep + 500);
+		$this->updateSubStep($substep + $step_size);
 		$this->checkTimeout(__FUNCTION__);
 	}
 
@@ -271,20 +273,21 @@ class mbt_to_tbg
 	*/
 	function doStep3()
 	{
+		$step_size = 500;
 		$substep = $this->getSubStep(__FUNCTION__);
 
 		$query = '
 			SELECT
 				name
 				FROM ' . $this->mbt_db_prefix . 'category_table
-			LIMIT ' . $substep . ' 500';
+			LIMIT ' . $substep . ' ' . $step_size;
 
 		foreach ($this->db->query($sql) as $row)
 			$this->db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'listtypes (name, itemtype, scope)
 				VALUES (' . $row['name'] . ', "category", 1)');
 
-		$this->updateSubStep($substep + 500);
+		$this->updateSubStep($substep + $step_size);
 		$this->checkTimeout(__FUNCTION__);
 	}
 
@@ -294,6 +297,7 @@ class mbt_to_tbg
 	*/
 	function doStep4()
 	{
+		$step_size = 500;
 		$substep = $this->getSubStep(__FUNCTION__);
 
 		// Obtain any current builds.
@@ -309,7 +313,7 @@ class mbt_to_tbg
 			SELECT
 				id, project_id, version, released AS isreleased
 				FROM ' . $this->mbt_db_prefix . 'project_version_table
-			LIMIT ' . $substep . ' 500';
+			LIMIT ' . $substep . ' ' . $step_size;
 
 		foreach ($this->db->query($sql) as $row)
 		{
@@ -323,7 +327,7 @@ class mbt_to_tbg
 
 		}
 
-		$this->updateSubStep($substep + 500);
+		$this->updateSubStep($substep + $step_size);
 		$this->checkTimeout(__FUNCTION__);
 	}
 
@@ -334,6 +338,7 @@ class mbt_to_tbg
 	*/
 	function doStep5()
 	{
+		$step_size = 500;
 		$substep = $this->getSubStep(__FUNCTION__);
 
 		// Obtain any current builds.
@@ -361,7 +366,7 @@ class mbt_to_tbg
 					version
 				FROM ' . $this->mbt_db_prefix . 'bug_table AS bt
 					LEFT JOIN ' . $this->mbt_db_prefix . 'bug_text_table AS btt ON (btt.id = bt.bug_text_id)
-			LIMIT ' . $substep . ' 500';
+			LIMIT ' . $substep . ' ' . $step_size;
 
 		foreach ($this->db->query($sql) as $row)
 		{
@@ -383,7 +388,7 @@ class mbt_to_tbg
 				INSERT INTO (' . $this->tbg_db_prefix . 'issueaffectsbuild (id, build) VALUES(' . $row['id'] . ', ' . $affect_id . ')');
 		}
 
-		$this->updateSubStep($substep + 500);
+		$this->updateSubStep($substep + $step_size);
 		$this->checkTimeout(__FUNCTION__);
 	}
 
@@ -393,6 +398,7 @@ class mbt_to_tbg
 	*/
 	function doStep6()
 	{
+		$step_size = 500;
 		$substep = $this->getSubStep(__FUNCTION__);
 
 		$query = '
@@ -401,15 +407,73 @@ class mbt_to_tbg
 				bn.reporter_id AS updated_by, bn.reporter_id AS posted_by, bnt.note AS content
 				FROM ' . $this->mbt_db_prefix . 'bugnote_table AS bn
 					INNER JOIN ' . $this->mbt_db_prefix . 'butnote_text_table AS bnt ON (bn.id = bnt.bug_text_id)
-			LIMIT ' . $substep . ' 500';
+			LIMIT ' . $substep . ' ' . $step_size;
 
 		foreach ($this->db->query($sql) as $row)
 			$this->db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'comments (id, target_id, updated, posted, updated_by, posted_by, content)
 				VALUES (' . $row['id'] . ', ' . $row['target_id'] . ', ' . $row['updated'] . ', ' . $row['posted'] . ', ' . $row['updated_by'] . ', ' . $row['posted_by'] . ', "' . $row['content'] . '")');
 
-		$this->updateSubStep($substep + 500);
+		$this->updateSubStep($substep + $step_size);
 		$this->checkTimeout(__FUNCTION__);
+	}
+
+	/**
+	* Relationships are great.
+	*
+	*/
+	function doStep7()
+	{
+		$step_size = 500;
+		$substep = $this->getSubStep(__FUNCTION__);
+
+		$query = '
+			SELECT
+				source_bug_id AS parent_id, destination_bug_id AS child_id
+				FROM ' . $this->mbt_db_prefix . 'bug_relationships_table
+			LIMIT ' . $substep . ' ' . $step_size;
+
+		foreach ($this->db->query($sql) as $row)
+			$this->db->query('
+				INSERT INTO ' . $this->tbg_db_prefix . 'issuerelations (parent_id, child_id)
+				VALUES (' . $row['parent_id'] . ', ' . $row['child_id'] . ')');
+
+
+		$this->updateSubStep($substep + $step_size);
+		$this->checkTimeout(__FUNCTION__);
+	}
+
+	/**
+	* Attachments, the pain of our every existence)
+	*
+	*/
+	function doStep8
+	{
+		$step_size = 100;
+		$substep = $this->getSubStep(__FUNCTION__);
+
+		// @TODO: GET THE ATTACHMENT LOCATION
+		/*
+		// TGB appears to allow storage of files in the database.  The source code appears to work it out properly whether it is in the database or local storage.
+		$result = $this->db->query('SELECT upload_localpath FROM ' . $this->tbg_db_prefix . 'settings WHERE name = "upload_localpath" AND scope = 1');
+		$attachment_path = $result['upload_localpath'];
+		*/
+
+		$query = '
+			SELECT
+				id, user_id AS uid, 1 AS scope, filename AS real_filename, filename AS original_filename,
+				file_type AS content_type, content, date_added AS uploaded_at, description
+				FROM ' . $this->mbt_db_prefix . 'bug_file_table
+			LIMIT ' . $substep . ' ' . $step_size;
+
+		foreach ($this->db->query($sql) as $row)
+			$this->db->query('
+				INSERT INTO ' . $this->tbg_db_prefix . 'files (id, uid, scope, real_filename, original_filename, content_type, content, uploaded_at, description)
+				VALUES (' . $row['id'] . ', ' . $row['uid'] . ', ' . $row['scope'] . ', "' . $row['real_filename'] . '", "' . $row['original_filename'] . '", "' . $row['content_type'] . '", "' . $row['content'] . '", ' . $row['uploaded_at'] . ', "' . $row['description'] . '")');
+
+		$this->updateSubStep($substep + $step_size);
+		$this->checkTimeout(__FUNCTION__);
+
 	}
 }
 
