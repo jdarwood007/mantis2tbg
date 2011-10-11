@@ -45,7 +45,6 @@ class tbg_coverter
 	protected $tbg_scope = 1;
 
 	// The database prefixes (including the database).
-	protected $mbt_db_prefix;
 	protected $tbg_db_prefix;
 
 	// The start timer.
@@ -142,10 +141,9 @@ class tbg_coverter
 	/**
 	 * Set the prefix that will be used prior to every reference of a table
 	 */
-	private function setDatabasePrefix()
+	private function setTBGDatabasePrefix()
 	{
 		$this->tbg_db_prefix = $this->tbg_db_name . '.' . $this->tbg_db_table_prefix;
-		$this->mbt_db_prefix = $this->mbt_db_name . '.' . $this->mbt_db_table_prefix;
 	}
 
 	/**
@@ -238,6 +236,17 @@ class tbg_coverter
 
 class mbt_to_tbg extends tbg_converter
 {
+	protected $mbt_db_prefix;
+
+	/**
+	 * Set the prefix that will be used prior to every reference of a table
+	 */
+	private function setDatabasePrefix()
+	{
+		$this->setTBGDatabasePrefix();
+		$this->mbt_db_prefix = $this->mbt_db_name . '.' . $this->mbt_db_table_prefix;
+	}
+
 	/**
 	 * Sets the list types in TBG to be like MBT
 	 * 
