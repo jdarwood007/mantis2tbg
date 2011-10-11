@@ -1,4 +1,5 @@
 <?php
+// @NOTE: THIS CONVERTER IS IN DEVELOPMENT AND IS MOSTLY THEORETICAL UNTESTED CODE.
 
 /**
  * Convert Mantis Bug Tracker to The Bug Genie
@@ -15,7 +16,13 @@
  *  TBG = The Bug Genie
  */
 
-class mbt_to_tbg
+/*
+* @TODO The developers list of things todo.	
+* Add js to support ajax
+* Add ajax support
+*/
+
+class tbg_coverter
 {
 	// Where your config_inc.php is located
 	//const MBT_PATH = '';
@@ -61,14 +68,81 @@ class mbt_to_tbg
 		if (function_exists('apache_reset_timeout'))
 			apache_reset_timeout();
 
-		$this->setDatabasePrefix();
-		$this->getDatabaseConnection();
+		// Try to find some settings.
+		$this->loadSettings();
+		
+		// We can't process anymore until this exists.
+		if (empty($this->db_user))
+		{
+		}
+		else
+		{
+			$this->setDatabasePrefix();
+			$this->getDatabaseConnection();
+		}
+	}
+
+	/**
+	* Request these settings during setup.
+	*
+	*/
+	private function converterSettings()
+	{
+		return array(
+			'mantis_loc' => array('type' => 'text', 'required' => true, 'validate' => 'return file_exists($data);'),
+			'tbg_loc' => array('type' => 'text', 'required' => true, 'default' => dirname(__FILE__), 'validate' => 'return file_exists($data);')
+			// @TODO: Make this validate the password.
+			'tbg_db_pass' => array('type' => 'password', 'required' => true, 'validate' => true,),
+		);
+	}
+
+	/**
+	* Request these settings during setup.
+	*
+	*/
+	private function loadSettings()
+	{
+		// Lets check our session.
+		if (session_id() == '')
+			session_start();
+
+		if (isset($_SESSION['tbg_converter']))
+		{
+			foreach (unserialize($_SESSION['tbg_converter']) as $key => $data)
+				$this->{$key} = $data;
+
+			return;
+		}
+	}
+
+	/**
+	* Save the settings..
+	*
+	*/
+	private function setSettings()
+	{
+		$settings = $this->converterSettings()
+		$new_settings = array();
+		foreach ($settings as $key => $details)
+		{
+			// We are saving then
+			if (isset($_POST[$key]))
+			{
+				if (isset($details['validate']) && eval($details['validate']) !== true)
+					$errors[$key] = $key . ' contains invalid_data';
+
+				$new_settings[$key] = $_POST[$key];
+			}
+		}
+
+		// Save these.
+		$_SESSION['tbg_converter'] = serialize($new_settings);
 	}
 
 	/**
 	 * Set the prefix that will be used prior to every reference of a table
 	 */
-	function setDatabasePrefix()
+	private function setDatabasePrefix()
 	{
 		$this->tbg_db_prefix = $this->tbg_db_name . '.' . $this->tbg_db_table_prefix;
 		$this->mbt_db_prefix = $this->mbt_db_name . '.' . $this->mbt_db_table_prefix;
@@ -80,46 +154,6 @@ class mbt_to_tbg
 	function getDatabaseConnection()
 	{
 		$this->db = new PDO ($this->db_driver . ':host=' . $this->db_host, $this->db_user, $this->db_pass);
-	}
-
-	/**
-	 * Sets the list types in TBG to be like MBT
-	 * 
-	 * @param array $types = array('category', 'priority', 'reproducability', 'resolution', 'severity', 'status') an array of what types to set
-	 */
-	function setListTypes($types = array())
-	{
-		$allowed_types = array('category', 'priority', 'reproducability', 'resolution', 'severity', 'status');
-		$types = empty($types) ? $allowed_types : array_intersect($allowed_types, $types);
-
-		$types_conversion = array(
-			'category' => array(
-				
-			),
-			'priority' => array(
-				
-			),
-			'reproducability' => array(
-				'Always' => 10,
-				'Sometimes' => 30,
-				'Random' => 50,
-				'Have not tried' => 70,
-				'Unable to reproduce' => 90,
-				'N/A' => 100
-			),
-			'resolution' => array(
-				
-			),
-			'severity' => array(
-				
-			),
-			'status' => array(
-				
-			));
-		foreach ($types as $type)
-		{
-			
-		}
 	}
 
 	/**
@@ -199,6 +233,49 @@ class mbt_to_tbg
 		// @ TODO: Add in timeout stuff here.
 		// @ !!! If this is all done via ajax, it should be a json or xml return.
 		// @ !!! Will need to strip doStep from the function name and cast as a int for security.
+	}
+}
+
+class mbt_to_tbg extends tbg_converter
+{
+	/**
+	 * Sets the list types in TBG to be like MBT
+	 * 
+	 * @param array $types = array('category', 'priority', 'reproducability', 'resolution', 'severity', 'status') an array of what types to set
+	 */
+	function setListTypes($types = array())
+	{
+		$allowed_types = array('category', 'priority', 'reproducability', 'resolution', 'severity', 'status');
+		$types = empty($types) ? $allowed_types : array_intersect($allowed_types, $types);
+
+		$types_conversion = array(
+			'category' => array(
+				
+			),
+			'priority' => array(
+				
+			),
+			'reproducability' => array(
+				'Always' => 10,
+				'Sometimes' => 30,
+				'Random' => 50,
+				'Have not tried' => 70,
+				'Unable to reproduce' => 90,
+				'N/A' => 100
+			),
+			'resolution' => array(
+				
+			),
+			'severity' => array(
+				
+			),
+			'status' => array(
+				
+			));
+		foreach ($types as $type)
+		{
+			
+		}
 	}
 
 	/**
@@ -477,98 +554,68 @@ class mbt_to_tbg
 	}
 }
 
-
-
-
-// Not sure if these classes will be used.
-// @ Why do we need these?  Its a converter only for mantis to TBG.  Don't need to make things complicated.
-class tbg extends mbt_to_tbg
+/*
+* Theme wrapper.
+*
+*/
+class tbg_converter_wrapper
 {
-	function setReproducability()
+	protected $page_title = 'Mantis to The Bug Genie converter';
+
+	/*
+	* Set the title.
+	* @param $title: The page title to set
+	*/
+	public static function setHeader($title)
 	{
-		// Delete from listtypes where itemtype = reproducability
-		// Insert into listtypes, get the item
-		// Update issues with reproducability number
-		
+		self:$page_title = $title;
 	}
 
-	function setCategory()
+	/*
+	* Any custom header()s
+	*
+	*/
+	public static function header()
 	{
-		
+
 	}
 
-	function removeListType($type, $id = 0)
+	/*
+	* The upper part of the theme.
+	*
+	*/
+	public static function upper()
 	{
-		// Don't allow them to remove a bad type.
-		if (!in_array($type, array('category', 'priority', 'reproducability', 'resolution', 'severity', 'status')))
-			return;
+		echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/html">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<title>', self:$page_title, '</title>
+	<style type="text/css">
+	<!--
+	-->
+	</style>' : ''), '
+</head>
+<body>
+	<div>
+		<div style="padding: 10px; padding-right: 0px; padding-left: 0px; width:98% ">
+			<div style="padding-left: 200px; padding-right: 0px;">
+				<h1>', self:$page_title, '</h1>
+				<div class="panel" style="padding-right: 0px;  white-space: normal; overflow: hidden;">';
+	}
 
-		if (empty($id))
-			return $this->db->query('
-				DELETE FROM ' . $this->tbg_db_prefix . 'listtype
-				WHERE itemtype=\'' . $type . '\'');
-		else
-			return $this->db->query('
-				DELETE FROM ' . $this->tbg_db_prefix . 'listtype
-				WHERE itemtype=\'' . $type . '\')
-					AND id=\'' . (int) $id . '\'');	
+	/*
+	* The lower part of the theme.
+	*
+	*/
+	public static function lower();
+	{
+		echo '
+				</div>
+			</div>
+		</div>
+	</div>
+</body></html>';
+
 	}
 }
-/*Severity: feature = 10; trivial = 20; text = 30; tweak = 40; minor = 50; major = 60; crash = 70; block = 80;
-
-Priority: none = 10; low = 20; normal = 30; high = 40; urgent = 50; immediate = 60;*/
-class mtb extends mbt_to_tbg
-{
-	function getAdmins()
-	{
-		$result = $this->db->query('
-			SELECT MAX(' . $this->mbt_db_prefix . 'user_table.access_level)
-		');
-	}
-	function getReproducability()
-	{
-		return array(
-			'Always' => 10,
-			'Sometimes' => 30,
-			'Random' => 50,
-			'Have not tried' => 70,
-			'Unable to reproduce' => 90,
-			'N/A' => 100
-		);
-	}
-
-	function getSeverity()
-	{
-		return array(
-			'Feature' => 10,
-			'Trivial' => 20,
-			'Text' => 30,
-			'Tweak' => 40,
-			'Minor' => 50,
-			'Major' => 60,
-			'Crash' => 70,
-			'Block' => 80
-		);
-	}
-
-	function getPriority()
-	{
-		return array(
-			'None' => 10,
-			'Low' => 20,
-			'Normal' => 30,
-			'High' => 40,
-			'Urgent' => 50,
-			'Immediate' => 60
-		);
-	}
-
-	// TBG cannot do categories by project or user so ignore those.
-	function getCategory()
-	{
-		/*
-		 * 	SELECT *
-		 * 	FROM {mtb}category_table
-		 */ 
-	}
-} 
