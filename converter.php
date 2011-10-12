@@ -89,7 +89,7 @@ class tbg_coverter
 	{
 		return array(
 			'mantis_loc' => array('type' => 'text', 'required' => true, 'validate' => 'return file_exists($data);'),
-			'tbg_loc' => array('type' => 'text', 'required' => true, 'default' => dirname(__FILE__), 'validate' => 'return file_exists($data);')
+			'tbg_loc' => array('type' => 'text', 'required' => true, 'default' => dirname(__FILE__), 'validate' => 'return file_exists($data);'),
 			// @TODO: Make this validate the password.
 			'tbg_db_pass' => array('type' => 'password', 'required' => true, 'validate' => true,),
 		);
@@ -120,7 +120,7 @@ class tbg_coverter
 	*/
 	private function setSettings()
 	{
-		$settings = $this->converterSettings()
+		$settings = $this->converterSettings();
 		$new_settings = array();
 		foreach ($settings as $key => $details)
 		{
@@ -458,9 +458,10 @@ class mbt_to_tbg extends tbg_converter
 		{
 			$this->db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'issues (id, project_id, title, assigned_to, duplicate_of, posted, last_updated, state, category, resolution, priority, severity, reproducability)
-				VALUES (' . $row['id'] . ', ' . $row['project_id'] . ', "' . $row['title'] . '", ' . $row['assigned_to'] . ', ' . $row['duplicate_of'] . ', ' . $row['posted'] . ', ' . $row['last_updated'] . ', ' . $row['state'] . ', ' . $row['category'] . ', ' . $row['category'] . ', ' . $row['resolution'] . ', ' . $row['priority'] . ', ' . $row['severity'] . ', ' . $row['reproducability'] . ')');
+				VALUES (' . $row['id'] . ', ' . $row['project_id'] . ', "' . $row['title'] . '", ' . $row['assigned_to'] . ', ' . $row['duplicate_of'] . ', ' . $row['posted'] . ', ' . $row['last_updated'] . ', ' . $row['state'] . ', ' . $row['category'] . ', ' . $row['category'] . ', ' . $row['resolution'] . ', ' . $row['priority'] . ', ' . $row['severity'] . ', ' . $row['reproducability'] . ')
+			');
 
-			if (!isset(builds[$row['version']]))
+			if (!isset($builds[$row['version']]))
 			{
 				$this->db->query('
 					INSERT INTO (' . $this->tbg_db_prefix . 'builds (name) VALUES (' . $row['version'] . ')');
@@ -533,7 +534,7 @@ class mbt_to_tbg extends tbg_converter
 	* Attachments, the pain of our every existence)
 	*
 	*/
-	function doStep8
+	function doStep8()
 	{
 		$step_size = 100;
 		$substep = $this->getSubStep(__FUNCTION__);
@@ -599,17 +600,17 @@ class tbg_converter_wrapper
 <html xmlns="http://www.w3.org/1999/html">
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-	<title>', self:$page_title, '</title>
+	<title>', self::$page_title, '</title>
 	<style type="text/css">
 	<!--
 	-->
-	</style>' : ''), '
+	</style>
 </head>
 <body>
 	<div>
 		<div style="padding: 10px; padding-right: 0px; padding-left: 0px; width:98% ">
 			<div style="padding-left: 200px; padding-right: 0px;">
-				<h1>', self:$page_title, '</h1>
+				<h1>', self::$page_title, '</h1>
 				<div class="panel" style="padding-right: 0px;  white-space: normal; overflow: hidden;">';
 	}
 
@@ -617,7 +618,7 @@ class tbg_converter_wrapper
 	* The lower part of the theme.
 	*
 	*/
-	public static function lower();
+	public static function lower()
 	{
 		echo '
 				</div>
