@@ -7,16 +7,16 @@ Translation table guide:
 
 Mantis Table	Mantis Column	TBG Table	TBG Column	Notes
 
-user_table	id	tbg3_users	id
-user_table	username	tbg3_users	username, buddyname
-user_table	realname	tbg3_users	realname
-user_table	email	tbg3_users	email
-user_table	password		password	Will send a new password to every user
-user_table	enabled	tbg3_users	enabled
-user_table	protected			Not sure what this is for
-user_table	access_level	tbg3_users		Get the MAX(user_table.access_level) to find who is an administrator. I think >= 90 is an admin - TBG admin group is id 1, otherwise set to 2. zegenie: Could also use the "admingroup" (admins) and "defaultgroup" (users) setting from tbg3_settings
-user_table	last_visit		lastseen
-user_table	date_created		joined
+user_table		id				tbg3_users	id
+user_table		username		tbg3_users	username, buddyname
+user_table		realname		tbg3_users	realname
+user_table		email			tbg3_users	email
+user_table		password		password	Will send a new password to every user
+user_table		enabled			tbg3_users	enabled
+user_table		protected			Not sure what this is for
+user_table		access_level	tbg3_users		Get the MAX(user_table.access_level) to find who is an administrator. I think >= 90 is an admin - TBG admin group is id 1, otherwise set to 2. zegenie: Could also use the "admingroup" (admins) and "defaultgroup" (users) setting from tbg3_settings
+user_table		last_visit		lastseen
+user_table		date_created		joined
 
 tag_table		Not porting
 

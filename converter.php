@@ -562,12 +562,102 @@ class mbt_to_tbg extends tbg_converter
 		$this->checkTimeout(__FUNCTION__);
 
 	}
+
+	private function getIssues()
+	{
+		// Get the basics - we'll fix it up in a minute.
+		$this->db->query('
+			INSERT INTO ' . $this->tbg_prefix . 'issues
+				id, project_id, title, assigned_to, duplicate_of, posted, last_updated,
+				state, category, resolution, priority, severity, reproducability
+			SELECT bt.id, bt.project_id, bt.summary AS title, bt.handler_id AS assigned_to,
+				bt.duplicate_id AS duplicate_of, bt.date_submitted AS posted, bt.last_updated,
+				bt.status AS state, bt.category_id AS category, bt.resolution, bt.priority,
+				bt.severity, bt.reproducability, btt.steps_to_reproduce AS reproduction_steps, btt.description
+			FROM ' . $this->mtb_prefix . 'bug_table AS bt
+			LEFT JOIN ' . $this->mtb_prefix . 'bug_text_table AS btt ON (btt.id = bt.bug_text_id)
+			'
+		);
+
+		// Update reproducability
+		// Mantis (always = 10; sometimes = 30; random = 50; have not tried = 70; unable to reproduce = 90; N/A = 100)
+		// TBG (Always = 12; Often = 11; Rarely = 10; Can't reproduce = 9)
+		// Mantis->TBG (10->12, 30->11, 50->10, 90->9, 70->null, 100->null)
+		$this->db->query('
+			UPDATE ' . $this->tbg_prefix . 'issues
+			SET reproducability =
+				CASE reproducability
+					WHEN 10 THEN 12
+					WHEN 30 THEN 11
+					WHEN 50 THEN 10
+					WHEN 90 THEN 9
+					WHEN 70 THEN null
+					WHEN 100 THEN null
+		');
+
+		// Update severity
+		// Mantis (feature = 10; trivial = 20; text = 30; tweak = 40; minor = 50; major = 60; crash = 70; block = 80;)
+		// TBG (Low = 20; Normal = 21; Critical = 22)
+		// Mantis->TBG ()
+		$this->db->query('
+			UPDATE ' . $this->tbg_prefix . 'issues
+			SET severity =
+				CASE severity
+					WHEN 10 THEN 
+					WHEN 20 THEN 
+					WHEN 30 THEN 
+					WHEN 40 THEN 
+					WHEN 50 THEN 
+					WHEN 60 THEN 
+					WHEN 70 THEN 
+					WHEN 80 THEN 
+		');
+
+		// Update priority
+		// Mantis (none = 10; low = 20; normal = 30; high = 40; urgent = 50; immediate = 60)
+		// TBG()
+		$this->db->query('
+			UPDATE ' . $this->tbg_prefix . 'issues
+			SET priority =
+				CASE priority
+					WHEN 10 THEN 
+					WHEN 20 THEN 
+					WHEN 30 THEN 
+					WHEN 40 THEN 
+					WHEN 50 THEN 
+					WHEN 60 THEN 
+					WHEN 70 THEN 
+					WHEN 80 THEN 
+		');
+	}
+
+	private function getComments()
+	{
+		$this->db->query('
+			INSERT INTO ' . $this->tbg_prefix . 'comments
+				target_id, updated, posted, updated_by, posted_by, content			
+			SELECT bn.bug_id AS target_id, bn.last_modified AS updated, bn.date_submitted AS posted,
+				bn.reporter_id AS updated_by, bn.reporter_id AS posted_by, btt.note AS content
+			FROM ' . $this->mtb_prefix . 'bugnote_table AS bn
+			LEFT JOIN ' . $this->mtb_prefix . 'bugnote_text_table AS btt ON(' . $this->mtb_prefix . 'bugnote_text_table.id = ' . $this->mtb_prefix . 'bugnote_table.id)'
+		);
+		
+	}
+
+	private function getProjects()
+	{
+		$this->db->query('
+			INSERT INTO ' . $this->tbg_prefix . 'projects
+				id, name, locked, description	
+			SELECT id, name, enabled AS locked, description
+			FROM ' . $this->mtb_prefix . 'project_table
+		);
+	}
 }
 
-/*
-* Theme wrapper.
-*
-*/
+/** 
+ * Theme wrapper.
+ */
 class tbg_converter_wrapper
 {
 	protected $page_title = 'Mantis to The Bug Genie converter';
