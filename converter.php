@@ -52,12 +52,15 @@ class tbg_coverter
 
 	// Is this CLI?
 	protected $is_cli = false;
+	protected $is_json = false;
 
 	// The database connection resource.
 	protected $db;
 
 	function __construct()
 	{
+		global $theme;
+
 		// Start your engines.
 		$this->start_time = time();
 
@@ -69,7 +72,10 @@ class tbg_coverter
 
 		// Try to find some settings.
 		$this->loadSettings();
-		
+
+		// Open a new theme.
+		$theme = new tbg_converter_wrapper();
+
 		// We can't process anymore until this exists.
 		if (empty($this->db_user))
 		{
@@ -78,6 +84,16 @@ class tbg_coverter
 		{
 			$this->setDatabasePrefix();
 			$this->getDatabaseConnection();
+
+			// Fire this thing off.
+			$this->loadSettings();
+
+			// Now restart.
+			$this->updateSubStep($this->substep);
+			$this->updateStep('doStep' . $this->step);
+
+			$function = 'doStep' . $this->step;
+			$function();
 		}
 	}
 
@@ -88,7 +104,6 @@ class tbg_coverter
 	private function converterSettings()
 	{
 		return array(
-			'mantis_loc' => array('type' => 'text', 'required' => true, 'validate' => 'return file_exists($data);'),
 			'tbg_loc' => array('type' => 'text', 'required' => true, 'default' => dirname(__FILE__), 'validate' => 'return file_exists($data);'),
 			// @TODO: Make this validate the password.
 			'tbg_db_pass' => array('type' => 'password', 'required' => true, 'validate' => true,),
@@ -144,14 +159,18 @@ class tbg_coverter
 	private function setTBGDatabasePrefix()
 	{
 		$this->tbg_db_prefix = $this->tbg_db_name . '.' . $this->tbg_db_table_prefix;
-	}
 
+		return true;
+	}
 	/**
+
 	 * Establish a database connection
 	 */
 	function getDatabaseConnection()
 	{
 		$this->db = new PDO ($this->db_driver . ':host=' . $this->db_host, $this->db_user, $this->db_pass);
+
+		return true;
 	}
 
 	/**
@@ -180,6 +199,19 @@ class tbg_coverter
 
 	/**
 	*
+	* Updates the current step
+	*
+	* @param init $substep new value for substep.
+	*/
+	function updateStep($substep)
+	{
+		$_GET['step'] = (int) $step;
+
+		return true;
+	}
+
+	/**
+	*
 	* Gets the current substep
 	*
 	* @param string $step The current function we are on.
@@ -201,6 +233,8 @@ class tbg_coverter
 	function updateSubStep($substep)
 	{
 		$_GET['substep'] = (int) $substep;
+
+		return true;
 	}
 
 	/**
@@ -211,6 +245,8 @@ class tbg_coverter
 	*/
 	function checkTimeout($function)
 	{
+		global $theme;
+
 		// CLI conversions can just continue.
 		if ($this->is_cli)
 		{
@@ -231,6 +267,23 @@ class tbg_coverter
 		// @ TODO: Add in timeout stuff here.
 		// @ !!! If this is all done via ajax, it should be a json or xml return.
 		// @ !!! Will need to strip doStep from the function name and cast as a int for security.
+		$real_step = str_replace('doStep', '', $function);
+
+		if (!is_int($real_step) || (int) $real_step == 0)
+		{
+			debug_print_backtrace();
+			exit;
+		}
+
+		// If ajax, return some data.
+		$data = array(
+			'step' => $function,
+			'time' => time(),
+			'substep' => getSubStep($function),
+		);
+
+		if ($this->is_json)
+			$theme->return_json($data);
 	}
 }
 
@@ -245,6 +298,20 @@ class mbt_to_tbg extends tbg_converter
 	{
 		$this->setTBGDatabasePrefix();
 		$this->mbt_db_prefix = $this->mbt_db_name . '.' . $this->mbt_db_table_prefix;
+	}
+
+	/**
+	* Request these settings during setup.
+	*
+	*/
+	private function converterSettings()
+	{
+		$settings = parent::converterSettings();
+
+		// As long as we don't overwrite, this should work.
+		return $settings + array(
+			'mantis_loc' => array('type' => 'text', 'required' => true, 'validate' => 'return file_exists($data);'),
+		);
 	}
 
 	/**
@@ -326,6 +393,7 @@ class mbt_to_tbg extends tbg_converter
 
 		$this->updateSubStep($substep + $step_size);
 		$this->checkTimeout(__FUNCTION__);
+		$this->updateStep(__FUNCTION__);
 	}
 
 	/**
@@ -351,6 +419,7 @@ class mbt_to_tbg extends tbg_converter
 
 		$this->updateSubStep($substep + $step_size);
 		$this->checkTimeout(__FUNCTION__);
+		$this->updateStep(__FUNCTION__);
 	}
 
 	/**
@@ -375,6 +444,7 @@ class mbt_to_tbg extends tbg_converter
 
 		$this->updateSubStep($substep + $step_size);
 		$this->checkTimeout(__FUNCTION__);
+		$this->updateStep(__FUNCTION__);
 	}
 
 	/**
@@ -415,6 +485,7 @@ class mbt_to_tbg extends tbg_converter
 
 		$this->updateSubStep($substep + $step_size);
 		$this->checkTimeout(__FUNCTION__);
+		$this->updateStep(__FUNCTION__);
 	}
 
 
@@ -477,6 +548,7 @@ class mbt_to_tbg extends tbg_converter
 
 		$this->updateSubStep($substep + $step_size);
 		$this->checkTimeout(__FUNCTION__);
+		$this->updateStep(__FUNCTION__);
 	}
 
 	/**
@@ -503,6 +575,7 @@ class mbt_to_tbg extends tbg_converter
 
 		$this->updateSubStep($substep + $step_size);
 		$this->checkTimeout(__FUNCTION__);
+		$this->updateStep(__FUNCTION__);
 	}
 
 	/**
@@ -528,6 +601,7 @@ class mbt_to_tbg extends tbg_converter
 
 		$this->updateSubStep($substep + $step_size);
 		$this->checkTimeout(__FUNCTION__);
+		$this->updateStep(__FUNCTION__);
 	}
 
 	/**
@@ -560,7 +634,7 @@ class mbt_to_tbg extends tbg_converter
 
 		$this->updateSubStep($substep + $step_size);
 		$this->checkTimeout(__FUNCTION__);
-
+		$this->updateStep(__FUNCTION__);
 	}
 
 	private function getIssues()
@@ -650,7 +724,7 @@ class mbt_to_tbg extends tbg_converter
 			INSERT INTO ' . $this->tbg_prefix . 'projects
 				id, name, locked, description	
 			SELECT id, name, enabled AS locked, description
-			FROM ' . $this->mtb_prefix . 'project_table
+			FROM ' . $this->mtb_prefix . 'project_table'
 		);
 	}
 }
@@ -661,36 +735,59 @@ class mbt_to_tbg extends tbg_converter
 class tbg_converter_wrapper
 {
 	protected $page_title = 'Mantis to The Bug Genie converter';
+	protected $headers = array();
 
 	/*
 	* Set the title.
 	* @param $title: The page title to set
 	*/
-	public static function setHeader($title)
+	public function setTitle($title)
 	{
-		self:$page_title = $title;
+		$this->page_title = $title;
 	}
 
 	/*
 	* Any custom header()s
 	*
 	*/
-	public static function header()
+	public function printHeader()
 	{
+		foreach ($this->headers as $type => $data)
+			header($type . ': ' . $data);
+	}
 
+	/*
+	* Set headers.
+	*
+	*/
+	public function setHeader($type, $data)
+	{
+		$this->headers[$type] = $data;
+	}
+
+	/*
+	* Return a json array.
+	* @param $data: The json data.
+	*/
+	public function return_json($data)
+	{
+		$this->setHeader('Content-Type', 'text/javascript; charset=utf8');
+
+		echo json_encode($data);
+		exit;
 	}
 
 	/*
 	* The upper part of the theme.
 	*
 	*/
-	public static function upper()
+	public function upper()
 	{
 		echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/html">
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-	<title>', self::$page_title, '</title>
+	<title>', $this->page_title, '</title>
 	<style type="text/css">
 	<!--
 	-->
@@ -700,7 +797,7 @@ class tbg_converter_wrapper
 	<div>
 		<div style="padding: 10px; padding-right: 0px; padding-left: 0px; width:98% ">
 			<div style="padding-left: 200px; padding-right: 0px;">
-				<h1>', self::$page_title, '</h1>
+				<h1>', $this->page_title, '</h1>
 				<div class="panel" style="padding-right: 0px;  white-space: normal; overflow: hidden;">';
 	}
 
@@ -708,7 +805,7 @@ class tbg_converter_wrapper
 	* The lower part of the theme.
 	*
 	*/
-	public static function lower()
+	public function lower()
 	{
 		echo '
 				</div>
