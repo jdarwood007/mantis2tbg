@@ -20,6 +20,7 @@
 * @TODO The developers list of things todo.	
 * Add js to support ajax
 * Add ajax support
+* Test
 */
 
 class tbg_coverter
@@ -78,23 +79,53 @@ class tbg_coverter
 
 		// We can't process anymore until this exists.
 		if (empty($this->db_user))
-		{
-		}
+			$this->converterSetup();
 		else
+			$this->doConversion();
+	}
+
+	/**
+	* Actually does the conversion process
+	*
+	*/
+	private function doConversion()
+	{
+		$this->setDatabasePrefix();
+		$this->getDatabaseConnection();
+
+		// Fire this thing off.
+		$this->loadSettings();
+
+		// Now restart.
+		$this->updateSubStep($this->substep);
+		$this->updateStep('doStep' . $this->step);
+
+		$function = 'doStep' . $this->step;
+		$function();
+	}
+
+	/**
+	* Ask the user for some settings, validate and then start conversion.
+	*
+	*/
+	private function converterSetup()
+	{
+		global $theme;
+
+		if (isset($_POST['save']))
 		{
-			$this->setDatabasePrefix();
-			$this->getDatabaseConnection();
+			$errors = $this->setSettings();
 
-			// Fire this thing off.
-			$this->loadSettings();
-
-			// Now restart.
-			$this->updateSubStep($this->substep);
-			$this->updateStep('doStep' . $this->step);
-
-			$function = 'doStep' . $this->step;
-			$function();
+			if ($errors === null)
+			{
+				// From here on, its all automatic.
+				$this->updateStep('doStep1');
+				$this->doConversion();
+			}
 		}
+
+		// Prompt for some settings.
+		$theme->showSettings($this->converterSettings());
 	}
 
 	/**
@@ -104,9 +135,9 @@ class tbg_coverter
 	private function converterSettings()
 	{
 		return array(
-			'tbg_loc' => array('type' => 'text', 'required' => true, 'default' => dirname(__FILE__), 'validate' => 'return file_exists($data);'),
+			'tbg_loc' => array('name' => 'The Bug Genie location', 'type' => 'text', 'required' => true, 'default' => dirname(__FILE__), 'validate' => 'return file_exists($data);'),
 			// @TODO: Make this validate the password.
-			'tbg_db_pass' => array('type' => 'password', 'required' => true, 'validate' => true,),
+			'tbg_db_pass' => array('name' => 'The Bug Genie database password', 'type' => 'password', 'required' => true, 'validate' => true,),
 		);
 	}
 
@@ -137,6 +168,8 @@ class tbg_coverter
 	{
 		$settings = $this->converterSettings();
 		$new_settings = array();
+		$errors = array();
+
 		foreach ($settings as $key => $details)
 		{
 			// We are saving then
@@ -149,8 +182,13 @@ class tbg_coverter
 			}
 		}
 
+		if (!empty($errors))
+			return $errors;
+
 		// Save these.
 		$_SESSION['tbg_converter'] = serialize($new_settings);
+
+		return null;
 	}
 
 	/**
@@ -815,4 +853,47 @@ class tbg_converter_wrapper
 </body></html>';
 
 	}
+
+	/*
+	* Show some settings.
+	*
+	*/
+	public function showSettings($settings)
+	{
+		echo '
+				<form action="', $_SERVER['PHP_SELF'], '" method="post" id="showSettings">
+					<dl>';
+
+		foreach ($settings as $key => $data)
+		{
+			echo '
+						<dt id="', $key, '_name">', $data['name'], '</dt>
+						<dd id="', $key, '_field">';
+
+			if ($data['type'] == 'textarea')
+				echo '<textarea name="', $key, '"></textarea>';
+			elseif ($data['type'] == 'select')
+			{
+				echo '<select name="', $key, '">';
+				
+				foreach ($data['options'] as $opt => $value)
+					echo '
+							<option name="', $opt, '">', $value, '</option>';
+
+				echo '
+						</select>';
+			}
+			else
+				echo '<input type="', $data['type'] == 'password' ? 'password' : 'text', '" name="', $key, '" />';
+
+			echo '</dd>';
+		}
+
+		echo '
+						<dt><input type="submit" value="Start conversion" /></dt>
+					</dl>
+				</form>';
+	}
+
+
 }
