@@ -51,6 +51,10 @@ class tbg_coverter
 	// The start timer.
 	protected $start_time = 0;
 
+	// Step info.
+	private $substep = 0;
+	private $step = 0;
+
 	// Is this CLI?
 	protected $is_cli = false;
 	protected $is_json = false;
@@ -97,11 +101,20 @@ class tbg_coverter
 		$this->loadSettings();
 
 		// Now restart.
-		$this->updateSubStep($this->substep);
-		$this->updateStep('doStep' . $this->step);
+		do
+		{
+			$data = $steps[$this->step];
 
-		$function = 'doStep' . $this->step;
-		$function();
+			$this->updateSubStep($this->substep);
+			$this->updateStep('doStep' . $this->step);
+			$this->step_size = $data[2];
+		}
+		while
+		{
+			$count = $data[1]();
+
+			$this->checkTimeout($data[1], $this->substep, $data[2], $count);
+		}
 	}
 
 	/**
@@ -158,6 +171,10 @@ class tbg_coverter
 
 			return;
 		}
+
+		// Load some from the url.
+		$this->step = (int) $_GET['step'];
+		$this->substep = (int) $_GET['substep'];
 	}
 
 	/**
@@ -241,9 +258,10 @@ class tbg_coverter
 	*
 	* @param init $substep new value for substep.
 	*/
-	function updateStep($substep)
+	function updateStep($step)
 	{
 		$_GET['step'] = (int) $step;
+		$this->step = (int) $step;
 
 		return true;
 	}
@@ -256,10 +274,7 @@ class tbg_coverter
 	*/
 	function getSubStep($step)
 	{
-		if (!isset($_GET['step']) || !isset($_GET['substep']) || str_replace('doStep', '', $step) != $_GET['step'])
-			return 0;
-		else
-			return (int) $_GET['substep'];
+			return $this->substep;
 	}
 
 	/**
@@ -271,6 +286,7 @@ class tbg_coverter
 	function updateSubStep($substep)
 	{
 		$_GET['substep'] = (int) $substep;
+		$this->substep = (int) $substep;
 
 		return true;
 	}
@@ -335,6 +351,18 @@ class mbt_to_tbg extends tbg_converter
 {
 	protected $mbt_db_prefix;
 
+	// What steps shall we take.
+	protected $steps = array(
+		// Key => array('Descriptive', 'functionName', (int) step_size),
+		0 = > array('Users', 'doStep1', 500),
+		1 = > array('Projects', 'doStep2', 500),
+		2 = > array('Categories', 'doStep3', 500),
+		3 = > array('Versions', 'doStep4', 500),
+		4 = > array('Issues', 'doStep5', 500),
+		5 = > array('Comments', 'doStep6', 500),
+		6 = > array('Relationships', 'doStep7', 500),
+		7 = > array('Attachments', 'doStep8', 100),
+	);
 	/**
 	 * Set the prefix that will be used prior to every reference of a table
 	 */
@@ -438,7 +466,7 @@ class mbt_to_tbg extends tbg_converter
 			++$i;
 		}
 
-		$this->checkTimeout(__FUNCTION__, $substep, $step_size, $i);
+		return $i;
 	}
 
 	/**
@@ -467,7 +495,7 @@ class mbt_to_tbg extends tbg_converter
 			++$i;
 		}
 
-		$this->checkTimeout(__FUNCTION__, $substep, $step_size, $i);
+		return $i;
 	}
 
 	/**
@@ -495,7 +523,7 @@ class mbt_to_tbg extends tbg_converter
 			++$i;
 		}
 
-		$this->checkTimeout(__FUNCTION__, $substep, $step_size, $i);
+		return $i;
 	}
 
 	/**
@@ -536,7 +564,7 @@ class mbt_to_tbg extends tbg_converter
 			++$i;
 		}
 
-		$this->checkTimeout(__FUNCTION__, $substep, $step_size, $i);
+		return $i;
 	}
 
 
@@ -600,7 +628,7 @@ class mbt_to_tbg extends tbg_converter
 			++$i;
 		}
 
-		$this->checkTimeout(__FUNCTION__, $substep, $step_size, $i);
+		return $i;
 	}
 
 	/**
@@ -630,7 +658,7 @@ class mbt_to_tbg extends tbg_converter
 			++$i;
 		}
 
-		$this->checkTimeout(__FUNCTION__, $substep, $step_size, $i);
+		return $i;
 	}
 
 	/**
@@ -658,7 +686,7 @@ class mbt_to_tbg extends tbg_converter
 			++$i;
 		}
 
-		$this->checkTimeout(__FUNCTION__, $substep, $step_size, $i);
+		return $i;
 	}
 
 	/**
@@ -694,7 +722,7 @@ class mbt_to_tbg extends tbg_converter
 			++$i;
 		}
 
-		$this->checkTimeout(__FUNCTION__, $substep, $step_size, $i);
+		return $i;
 	}
 
 	// @ TODO: Duplicate function, merge or remove.
