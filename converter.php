@@ -354,14 +354,14 @@ class mbt_to_tbg extends tbg_converter
 	// What steps shall we take.
 	protected $steps = array(
 		// Key => array('Descriptive', 'functionName', (int) step_size),
-		0 = > array('Users', 'doStep1', 500),
-		1 = > array('Projects', 'doStep2', 500),
-		2 = > array('Categories', 'doStep3', 500),
-		3 = > array('Versions', 'doStep4', 500),
-		4 = > array('Issues', 'doStep5', 500),
-		5 = > array('Comments', 'doStep6', 500),
-		6 = > array('Relationships', 'doStep7', 500),
-		7 = > array('Attachments', 'doStep8', 100),
+		1 = > array('Users', 'doStep1', 500),
+		array('Projects', 'doStep2', 500),
+		array('Categories', 'doStep3', 500),
+		array('Versions', 'doStep4', 500),
+		array('Issues', 'doStep5', 500),
+		array('Comments', 'doStep6', 500),
+		array('Relationships', 'doStep7', 500),
+		array('Attachments', 'doStep8', 100),
 	);
 	/**
 	 * Set the prefix that will be used prior to every reference of a table
