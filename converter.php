@@ -281,9 +281,15 @@ class tbg_coverter
 	*
 	* @param $function The function name we should return to if we can continue.
 	*/
-	function checkTimeout($function)
+	function checkTimeout($function, $substep, $max_step_size, $count)
 	{
 		global $theme;
+
+		$this->updateSubStep($substep + $max_step_size);
+
+		// Hold on, we had less results than we should have.
+		if ($max_step_size < $count)
+			$this->updateStep($function);
 
 		// CLI conversions can just continue.
 		if ($this->is_cli)
@@ -420,6 +426,7 @@ class mbt_to_tbg extends tbg_converter
 			LIMIT ' . $substep . ' ' . $step_size;
 
 		// We could let this save up a few inserts then do them at once, but are we really worried about saving queries here?
+		$i = 0;
 		foreach ($this->db->query($sql) as $row)
 		{
 			$password = $this->getRandomString();
@@ -427,11 +434,11 @@ class mbt_to_tbg extends tbg_converter
 			$this->db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'users (id, username, buddyname, realname, email, password, enabled, lastseen, joined)
 				VALUES (' . $row['id'] . ', "' . $row['username'] . '", "' . $row['buddyname'] . '", "' . $row['realname'] . '", "' . $row['email'] . '", "' . $password . '", ' . $row['enabled'] . ', ' . $row['username'] . ', ' . $row['joined'] . ')');
+
+			++$i;
 		}
 
-		$this->updateSubStep($substep + $step_size);
-		$this->checkTimeout(__FUNCTION__);
-		$this->updateStep(__FUNCTION__);
+		$this->checkTimeout(__FUNCTION__, $substep, $step_size, $i);
 	}
 
 	/**
@@ -450,14 +457,17 @@ class mbt_to_tbg extends tbg_converter
 				FROM ' . $this->mbt_db_prefix . 'project_table
 			LIMIT ' . $substep . ' ' . $step_size;
 
+		$i = 0;
 		foreach ($this->db->query($sql) as $row)
+		{
 			$this->db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'projects (id, name, locked, description)
 				VALUES (' . $row['id'] . ', "' . $row['name'] . '", ' . $row['locked'] . ', "' . $row['description'] . '")');
 
-		$this->updateSubStep($substep + $step_size);
-		$this->checkTimeout(__FUNCTION__);
-		$this->updateStep(__FUNCTION__);
+			++$i;
+		}
+
+		$this->checkTimeout(__FUNCTION__, $substep, $step_size, $i);
 	}
 
 	/**
@@ -475,14 +485,17 @@ class mbt_to_tbg extends tbg_converter
 				FROM ' . $this->mbt_db_prefix . 'category_table
 			LIMIT ' . $substep . ' ' . $step_size;
 
+		$i = 0;
 		foreach ($this->db->query($sql) as $row)
+		{
 			$this->db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'listtypes (name, itemtype, scope)
 				VALUES (' . $row['name'] . ', "category", 1)');
 
-		$this->updateSubStep($substep + $step_size);
-		$this->checkTimeout(__FUNCTION__);
-		$this->updateStep(__FUNCTION__);
+			++$i;
+		}
+
+		$this->checkTimeout(__FUNCTION__, $substep, $step_size, $i);
 	}
 
 	/**
@@ -509,6 +522,7 @@ class mbt_to_tbg extends tbg_converter
 				FROM ' . $this->mbt_db_prefix . 'project_version_table
 			LIMIT ' . $substep . ' ' . $step_size;
 
+		$i = 0;
 		foreach ($this->db->query($sql) as $row)
 		{
 			if (isset($builds[$version]))
@@ -519,11 +533,10 @@ class mbt_to_tbg extends tbg_converter
 
 			$builds[$row['version']] = $this->db->lastInsertId();
 
+			++$i;
 		}
 
-		$this->updateSubStep($substep + $step_size);
-		$this->checkTimeout(__FUNCTION__);
-		$this->updateStep(__FUNCTION__);
+		$this->checkTimeout(__FUNCTION__, $substep, $step_size, $i);
 	}
 
 
@@ -563,6 +576,7 @@ class mbt_to_tbg extends tbg_converter
 					LEFT JOIN ' . $this->mbt_db_prefix . 'bug_text_table AS btt ON (btt.id = bt.bug_text_id)
 			LIMIT ' . $substep . ' ' . $step_size;
 
+		$i = 0;
 		foreach ($this->db->query($sql) as $row)
 		{
 			$this->db->query('
@@ -582,11 +596,11 @@ class mbt_to_tbg extends tbg_converter
 
 			$this->db->query('
 				INSERT INTO (' . $this->tbg_db_prefix . 'issueaffectsbuild (id, build) VALUES(' . $row['id'] . ', ' . $affect_id . ')');
+
+			++$i;
 		}
 
-		$this->updateSubStep($substep + $step_size);
-		$this->checkTimeout(__FUNCTION__);
-		$this->updateStep(__FUNCTION__);
+		$this->checkTimeout(__FUNCTION__, $substep, $step_size, $i);
 	}
 
 	/**
@@ -606,14 +620,17 @@ class mbt_to_tbg extends tbg_converter
 					INNER JOIN ' . $this->mbt_db_prefix . 'butnote_text_table AS bnt ON (bn.id = bnt.bug_text_id)
 			LIMIT ' . $substep . ' ' . $step_size;
 
+		$i = 0;
 		foreach ($this->db->query($sql) as $row)
+		{
 			$this->db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'comments (id, target_id, updated, posted, updated_by, posted_by, content)
 				VALUES (' . $row['id'] . ', ' . $row['target_id'] . ', ' . $row['updated'] . ', ' . $row['posted'] . ', ' . $row['updated_by'] . ', ' . $row['posted_by'] . ', "' . $row['content'] . '")');
 
-		$this->updateSubStep($substep + $step_size);
-		$this->checkTimeout(__FUNCTION__);
-		$this->updateStep(__FUNCTION__);
+			++$i;
+		}
+
+		$this->checkTimeout(__FUNCTION__, $substep, $step_size, $i);
 	}
 
 	/**
@@ -631,15 +648,17 @@ class mbt_to_tbg extends tbg_converter
 				FROM ' . $this->mbt_db_prefix . 'bug_relationships_table
 			LIMIT ' . $substep . ' ' . $step_size;
 
+		$i = 0;
 		foreach ($this->db->query($sql) as $row)
+		{
 			$this->db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'issuerelations (parent_id, child_id)
 				VALUES (' . $row['parent_id'] . ', ' . $row['child_id'] . ')');
 
+			++$i;
+		}
 
-		$this->updateSubStep($substep + $step_size);
-		$this->checkTimeout(__FUNCTION__);
-		$this->updateStep(__FUNCTION__);
+		$this->checkTimeout(__FUNCTION__, $substep, $step_size, $i);
 	}
 
 	/**
@@ -665,16 +684,20 @@ class mbt_to_tbg extends tbg_converter
 				FROM ' . $this->mbt_db_prefix . 'bug_file_table
 			LIMIT ' . $substep . ' ' . $step_size;
 
+		$i = 0;
 		foreach ($this->db->query($sql) as $row)
+		{
 			$this->db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'files (id, uid, scope, real_filename, original_filename, content_type, content, uploaded_at, description)
 				VALUES (' . $row['id'] . ', ' . $row['uid'] . ', ' . $row['scope'] . ', "' . $row['real_filename'] . '", "' . $row['original_filename'] . '", "' . $row['content_type'] . '", "' . $row['content'] . '", ' . $row['uploaded_at'] . ', "' . $row['description'] . '")');
 
-		$this->updateSubStep($substep + $step_size);
-		$this->checkTimeout(__FUNCTION__);
-		$this->updateStep(__FUNCTION__);
+			++$i;
+		}
+
+		$this->checkTimeout(__FUNCTION__, $substep, $step_size, $i);
 	}
 
+	// @ TODO: Duplicate function, merge or remove.
 	private function getIssues()
 	{
 		// Get the basics - we'll fix it up in a minute.
@@ -715,14 +738,16 @@ class mbt_to_tbg extends tbg_converter
 			UPDATE ' . $this->tbg_prefix . 'issues
 			SET severity =
 				CASE severity
-					WHEN 10 THEN 
-					WHEN 20 THEN 
-					WHEN 30 THEN 
-					WHEN 40 THEN 
-					WHEN 50 THEN 
-					WHEN 60 THEN 
-					WHEN 70 THEN 
-					WHEN 80 THEN 
+					WHEN 10 THEN 21
+					WHEN 20 THEN 20
+					WHEN 30 THEN 20
+					WHEN 40 THEN 20
+					WHEN 50 THEN 20
+					WHEN 60 THEN 21
+					WHEN 70 THEN 22
+					WHEN 80 THEN 22
+					ELSE 21
+				END CASE
 		');
 
 		// Update priority
@@ -743,6 +768,7 @@ class mbt_to_tbg extends tbg_converter
 		');
 	}
 
+	// @ TODO: Duplicate function, merge or remove.
 	private function getComments()
 	{
 		$this->db->query('
@@ -756,6 +782,7 @@ class mbt_to_tbg extends tbg_converter
 		
 	}
 
+	// @ TODO: Duplicate function, merge or remove.
 	private function getProjects()
 	{
 		$this->db->query('
