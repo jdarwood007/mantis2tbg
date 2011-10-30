@@ -1,5 +1,7 @@
 <?php
 // @NOTE: THIS CONVERTER IS IN DEVELOPMENT AND IS MOSTLY THEORETICAL UNTESTED CODE.
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
 /**
  * Convert Mantis Bug Tracker to The Bug Genie
@@ -50,8 +52,8 @@ class tbg_converter
 	protected $start_time = 0;
 
 	// Step info.
-	private $substep = 0;
-	private $step = 0;
+	protected $substep = 0;
+	protected $step = 0;
 
 	// Is this CLI?
 	protected $is_cli = false;
@@ -94,7 +96,7 @@ class tbg_converter
 	* Actually does the conversion process
 	*
 	*/
-	private function processCLI()
+	public function processCLI()
 	{
 		$this->is_cli = true;
 
@@ -156,13 +158,10 @@ class tbg_converter
 	* Actually does the conversion process
 	*
 	*/
-	private function doConversion()
+	public function doConversion()
 	{
 		$this->setDatabasePrefix();
 		$this->getDatabaseConnection();
-
-		// Fire this thing off.
-		$this->loadSettings();
 
 		// Now restart.
 		do
@@ -173,7 +172,7 @@ class tbg_converter
 			$this->updateStep($data[1]);
 			$this->step_size = $data[2];
 
-			$count = $data[1]();
+			$count = $this->$data[1]();
 
 			$this->checkTimeout($data[1], $this->substep, $data[2], $count);
 		}
@@ -184,7 +183,7 @@ class tbg_converter
 	* Ask the user for some settings, validate and then start conversion.
 	*
 	*/
-	private function converterSetup()
+	public function converterSetup()
 	{
 		global $theme;
 
@@ -193,11 +192,7 @@ class tbg_converter
 			$errors = $this->setSettings();
 
 			if ($errors === null)
-			{
-				// From here on, its all automatic.
-				$this->updateStep('doStep1');
 				$this->doConversion();
-			}
 			else
 				$theme->errors($errors);
 		}
@@ -215,9 +210,9 @@ class tbg_converter
 	public function converterSettings()
 	{
 		return array(
-			'tbg_loc' => array('name' => 'The Bug Genie location', 'type' => 'text', 'required' => true, 'default' => dirname(__FILE__), 'validate' => 'return file_exists($data);'),
+			'tbg_loc' => array('name' => 'The Bug Genie location', 'type' => 'text', 'required' => true, 'default' => dirname(__FILE__), 'validate' => 'return file_exists($data) && file_exists($data . \'/index.php\');'),
 			// @TODO: Make this validate the password.
-			'tbg_db_pass' => array('name' => 'The Bug Genie database password', 'type' => 'password', 'required' => true, 'validate' => true,),
+			'tbg_db_pass' => array('name' => 'The Bug Genie database password', 'type' => 'password', 'required' => true, 'validate' => 'return true;',),
 		);
 	}
 
@@ -225,7 +220,7 @@ class tbg_converter
 	* Request these settings during setup.
 	*
 	*/
-	private function loadSettings()
+	public function loadSettings()
 	{
 		// Lets check our session.
 		if (session_id() == '')
@@ -235,20 +230,19 @@ class tbg_converter
 		{
 			foreach (unserialize($_SESSION['tbg_converter']) as $key => $data)
 				$this->{$key} = $data;
-
-			return;
 		}
 
 		// Load some from the url.
 		$this->step = (int) $_GET['step'];
-		$this->substep = (int) $_GET['substep'];
+
+		$this->substep = isset($_GET['substep']) ? (int) $_GET['substep'] : 0;
 	}
 
 	/**
 	* Save the settings..
 	*
 	*/
-	private function setSettings()
+	public function setSettings()
 	{
 		$settings = $this->converterSettings();
 		$new_settings = array();
@@ -259,8 +253,13 @@ class tbg_converter
 			// We are saving then
 			if (isset($_POST[$key]))
 			{
-				if (isset($details['validate']) && eval($details['validate']) !== true)
-					$errors[$key] = $key . ' contains invalid_data';
+				if (isset($details['validate']))
+				{
+					$temp = create_function('$data', $details['validate']);
+
+					if ($temp($_POST[$key]) === false)
+						$errors[$key] = '"' . $details['name'] . '" contains invalid_data';
+				}
 
 				$new_settings[$key] = $_POST[$key];
 			}
@@ -278,7 +277,7 @@ class tbg_converter
 	/**
 	 * Set the prefix that will be used prior to every reference of a table
 	 */
-	private function setTBGDatabasePrefix()
+	public function setTBGDatabasePrefix()
 	{
 		$this->tbg_db_prefix = $this->tbg_db_name . '.' . $this->tbg_db_table_prefix;
 
@@ -438,7 +437,7 @@ class mbt_to_tbg extends tbg_converter
 	/**
 	 * Set the prefix that will be used prior to every reference of a table
 	 */
-	private function setDatabasePrefix()
+	public function setDatabasePrefix()
 	{
 		$this->setTBGDatabasePrefix();
 		$this->mbt_db_prefix = $this->mbt_db_name . '.' . $this->mbt_db_table_prefix;
@@ -454,7 +453,7 @@ class mbt_to_tbg extends tbg_converter
 
 		// As long as we don't overwrite, this should work.
 		return $settings + array(
-			'mantis_loc' => array('name' => 'Mantis Location', 'type' => 'text', 'required' => true, 'validate' => 'return file_exists($data);'),
+			'mantis_loc' => array('name' => 'Mantis Location', 'type' => 'text', 'required' => true, 'validate' => 'return file_exists($data) && file_exists($data . \'/config_inc.php\');'),
 		);
 	}
 
@@ -527,7 +526,7 @@ class mbt_to_tbg extends tbg_converter
 
 		// We could let this save up a few inserts then do them at once, but are we really worried about saving queries here?
 		$i = 0;
-		foreach ($this->db->query($sql) as $row)
+		foreach ($this->db->query($query) as $row)
 		{
 			$password = $this->getRandomString();
 
@@ -558,7 +557,7 @@ class mbt_to_tbg extends tbg_converter
 			LIMIT ' . $substep . ' ' . $step_size;
 
 		$i = 0;
-		foreach ($this->db->query($sql) as $row)
+		foreach ($this->db->query($query) as $row)
 		{
 			$this->db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'projects (id, name, locked, description)
@@ -586,7 +585,7 @@ class mbt_to_tbg extends tbg_converter
 			LIMIT ' . $substep . ' ' . $step_size;
 
 		$i = 0;
-		foreach ($this->db->query($sql) as $row)
+		foreach ($this->db->query($query) as $row)
 		{
 			$this->db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'listtypes (name, itemtype, scope)
@@ -623,7 +622,7 @@ class mbt_to_tbg extends tbg_converter
 			LIMIT ' . $substep . ' ' . $step_size;
 
 		$i = 0;
-		foreach ($this->db->query($sql) as $row)
+		foreach ($this->db->query($query) as $row)
 		{
 			if (isset($builds[$version]))
 				continue;
@@ -655,7 +654,7 @@ class mbt_to_tbg extends tbg_converter
 				id, name
 				FROM ' . $this->mbt_db_prefix . 'builds';
 		$builds = array();
-		foreach ($this->db->query($sql) as $row)
+		foreach ($this->db->query($query) as $row)
 			$builds[$row['name']] = $row['id'];
 
 		$query = '
@@ -721,7 +720,7 @@ class mbt_to_tbg extends tbg_converter
 			LIMIT ' . $substep . ' ' . $step_size;
 
 		$i = 0;
-		foreach ($this->db->query($sql) as $row)
+		foreach ($this->db->query($query) as $row)
 		{
 			$this->db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'comments (id, target_id, updated, posted, updated_by, posted_by, content)
@@ -749,7 +748,7 @@ class mbt_to_tbg extends tbg_converter
 			LIMIT ' . $substep . ' ' . $step_size;
 
 		$i = 0;
-		foreach ($this->db->query($sql) as $row)
+		foreach ($this->db->query($query) as $row)
 		{
 			$this->db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'issuerelations (parent_id, child_id)
@@ -785,7 +784,7 @@ class mbt_to_tbg extends tbg_converter
 			LIMIT ' . $substep . ' ' . $step_size;
 
 		$i = 0;
-		foreach ($this->db->query($sql) as $row)
+		foreach ($this->db->query($query) as $row)
 		{
 			$this->db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'files (id, uid, scope, real_filename, original_filename, content_type, content, uploaded_at, description)
@@ -798,7 +797,7 @@ class mbt_to_tbg extends tbg_converter
 	}
 
 	// @ TODO: Duplicate function, merge or remove.
-	private function getIssues()
+	public function getIssues()
 	{
 		// Get the basics - we'll fix it up in a minute.
 		$this->db->query('
@@ -869,7 +868,7 @@ class mbt_to_tbg extends tbg_converter
 	}
 
 	// @ TODO: Duplicate function, merge or remove.
-	private function getComments()
+	public function getComments()
 	{
 		$this->db->query('
 			INSERT INTO ' . $this->tbg_prefix . 'comments
@@ -883,7 +882,7 @@ class mbt_to_tbg extends tbg_converter
 	}
 
 	// @ TODO: Duplicate function, merge or remove.
-	private function getProjects()
+	public function getProjects()
 	{
 		$this->db->query('
 			INSERT INTO ' . $this->tbg_prefix . 'projects
@@ -1236,7 +1235,7 @@ class tbg_converter_wrapper
 	public function showSettings($settings)
 	{
 		echo '
-				<form action="', $_SERVER['PHP_SELF'], '" method="post">
+				<form action="', $_SERVER['PHP_SELF'], '?step=1" method="post">
 					<dl>';
 
 		foreach ($settings as $key => $data)
@@ -1261,7 +1260,7 @@ class tbg_converter_wrapper
 			elseif ($data['type'] == 'password')
 				echo '<input type="password" name="', $key, '" />';
 			else
-				echo '<input type="text" name="', $key, '"', isset($data['default']) ? ' value="' . $data['default'] . '"' : '', ' />';
+				echo '<input type="text" name="', $key, '"', isset($data['default']) ? ' value="' . $data['default'] . '"' : (isset($_POST[$key]) ? $_POST[$key] : ''), ' />';
 
 			echo '</dd>';
 		}
