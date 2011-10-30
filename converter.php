@@ -23,7 +23,7 @@
 * Test
 */
 
-class tbg_coverter
+class tbg_converter
 {
 	// Where your config_inc.php is located
 	//const MBT_PATH = '';
@@ -69,6 +69,10 @@ class tbg_coverter
 		// Start your engines.
 		$this->start_time = time();
 
+		// We might be running this from terminal
+		if ((php_sapi_name() == 'cli' || (isset($_SERVER['TERM']) && strpos($_SERVER['TERM'], 'xterm') !== false)) && empty($_SERVER['REMOTE_ADDR']))
+			$this->processCLI();
+
 		// Don't timeout!
 		set_time_limit(0);
 
@@ -92,6 +96,68 @@ class tbg_coverter
 	* Actually does the conversion process
 	*
 	*/
+	private function processCLI()
+	{
+		$this->is_cli = true;
+
+		// First off, clean the buffers and buy us some time.
+		@ob_end_clean();
+		ob_implicit_flush(true);
+		@set_time_limit(600);
+
+		// This isn't good.
+		if (!isset($_SERVER['argv']))
+			$_SERVER['argv'] = array();
+
+		// If its empty, force help.
+		if (empty($_SERVER['argv'][1]))
+			$_SERVER['argv'][1] = '--help';
+
+		// Lets load up our possible arguments.
+		$settings = $this->converterSettings();
+
+		// We need help!.
+		if (in_array('--help', $_SERVER['argv']))
+		{
+			// This is a special case, where echo is fine here.
+			echo "
+			Usage: " . (isset($_ENV['_']) ? $_ENV['_'] : '/path/to/php') . " -f " . str_replace(getcwd() . '/', '', __FILE__) . " -- [OPTION]...\n";
+
+			foreach ($settings as $key => $setting)
+				echo '
+			--' . $key . '			' . $setting['name'];
+
+			// The debug option.
+			exit("
+		   	--debug				Output debugging information.\n");
+		}
+
+		// Lets get the settings.
+		foreach ($settings as $key => $setting)
+		{
+			// No special regex?
+			if (!isset($setting['cli_regex']))
+				$setting['cli_regex'] = '~^--' . $key . '=([^--]+)~i';
+
+			foreach ($_SERVER['argv'] as $i => $arg)
+			{
+				// Trim spaces.
+				$arg = trim($arg);
+
+				if (preg_match($setting['cli_regex'], $arg, $match) != 0)
+					$_POST[$key] = substr($match[1], -1) == '/' ? substr($match[1], 0, -1) : trim($match[1]);
+			}
+
+			// Oh noes, we can't find it!
+			if ($setting['required'] && empty($_POST[$key]))
+				exit('The argument, ' . $key . ', is required to continue.');
+		}
+	}
+
+	/**
+	* Actually does the conversion process
+	*
+	*/
 	private function doConversion()
 	{
 		$this->setDatabasePrefix();
@@ -103,18 +169,17 @@ class tbg_coverter
 		// Now restart.
 		do
 		{
-			$data = $steps[$this->step];
+			$data = $this->steps[$this->step];
 
 			$this->updateSubStep($this->substep);
-			$this->updateStep('doStep' . $this->step);
+			$this->updateStep($data[1]);
 			$this->step_size = $data[2];
-		}
-		while
-		{
+
 			$count = $data[1]();
 
 			$this->checkTimeout($data[1], $this->substep, $data[2], $count);
 		}
+		while ($this->step < count($this->steps));
 	}
 
 	/**
@@ -139,13 +204,15 @@ class tbg_coverter
 
 		// Prompt for some settings.
 		$theme->showSettings($this->converterSettings());
+
+		$theme->done($this->is_cli);
 	}
 
 	/**
 	* Request these settings during setup.
 	*
 	*/
-	private function converterSettings()
+	public function converterSettings()
 	{
 		return array(
 			'tbg_loc' => array('name' => 'The Bug Genie location', 'type' => 'text', 'required' => true, 'default' => dirname(__FILE__), 'validate' => 'return file_exists($data);'),
@@ -261,6 +328,7 @@ class tbg_coverter
 	function updateStep($step)
 	{
 		$_GET['step'] = (int) $step;
+
 		$this->step = (int) $step;
 
 		return true;
@@ -354,7 +422,7 @@ class mbt_to_tbg extends tbg_converter
 	// What steps shall we take.
 	protected $steps = array(
 		// Key => array('Descriptive', 'functionName', (int) step_size),
-		1 = > array('Users', 'doStep1', 500),
+		1 => array('Users', 'doStep1', 500),
 		array('Projects', 'doStep2', 500),
 		array('Categories', 'doStep3', 500),
 		array('Versions', 'doStep4', 500),
@@ -376,13 +444,13 @@ class mbt_to_tbg extends tbg_converter
 	* Request these settings during setup.
 	*
 	*/
-	private function converterSettings()
+	public function converterSettings()
 	{
 		$settings = parent::converterSettings();
 
 		// As long as we don't overwrite, this should work.
 		return $settings + array(
-			'mantis_loc' => array('type' => 'text', 'required' => true, 'validate' => 'return file_exists($data);'),
+			'mantis_loc' => array('name' => 'Mantis Location', 'type' => 'text', 'required' => true, 'validate' => 'return file_exists($data);'),
 		);
 	}
 
@@ -830,6 +898,34 @@ class tbg_converter_wrapper
 	protected $page_title = 'Mantis to The Bug Genie converter';
 	protected $headers = array();
 
+	/** 
+	 * Start the HTML.
+	*/
+	public function __construct($no_html = false)
+	{
+		// Do nothing!
+		if (!empty($no_html))
+			return;
+
+		// Some headers.
+		$this->printHeader();
+
+		// Upper part of theme.
+		$this->upper();
+	}
+
+	/** 
+	 * End of output.
+	*/
+	public function done($is_cli = false)
+	{
+		if ($is_cli)
+			exit("\nConversion completed");
+
+		$this->lower();
+		exit;
+	}
+
 	/*
 	* Set the title.
 	* @param $title: The page title to set
@@ -864,11 +960,27 @@ class tbg_converter_wrapper
 	*/
 	public function return_json($data)
 	{
-		$this->setHeader('Content-Type', 'text/javascript; charset=utf8');
-
+		header('Content-Type', 'text/javascript; charset=utf8');
+		
 		echo json_encode($data);
 		exit;
 	}
+
+	/*
+	* We have some new data!.
+	* @param $data: The json data.
+	*/
+	public function steps($steps)
+	{
+		echo '<ol>';
+
+		foreach ($steps as $id_step => $step)
+			echo '
+				<li id="step', $id_step, '"><span class="name">', $step[0], '</span><span class="progress"></span><span class="progress_percent" style="display: none;">0%</span></li>';
+
+		echo '</ol>';
+	}
+
 
 	/*
 	* The upper part of the theme.
@@ -952,3 +1064,5 @@ class tbg_converter_wrapper
 
 
 }
+
+$convert = new mbt_to_tbg();
