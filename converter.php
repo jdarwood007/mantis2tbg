@@ -25,10 +25,8 @@
 
 class tbg_converter
 {
-	// Where your config_inc.php is located
-	//const MBT_PATH = '';
-	// Where your b2db_boostrap.inc.php is located
-	//const TBG_PATH = '';
+	// Credits for the converter.
+	protected $main_credits = 'TBG converter &copy; Joshua Dickerson & Jeremy Darwood';
 
 	// The host, user, and pass must be on the same server
 	protected $db_driver = 'mysql';
@@ -83,7 +81,7 @@ class tbg_converter
 		$this->loadSettings();
 
 		// Open a new theme.
-		$theme = new tbg_converter_wrapper();
+		$theme = new tbg_converter_wrapper($this->steps, array($this->main_credits, $this->credits));
 
 		// We can't process anymore until this exists.
 		if (empty($this->db_user))
@@ -200,6 +198,8 @@ class tbg_converter
 				$this->updateStep('doStep1');
 				$this->doConversion();
 			}
+			else
+				$theme->errors($errors);
 		}
 
 		// Prompt for some settings.
@@ -412,11 +412,15 @@ class tbg_converter
 
 		if ($this->is_json)
 			$theme->return_json($data);
+		$theme->updateData($data);
 	}
 }
 
 class mbt_to_tbg extends tbg_converter
 {
+	// Credits for this part of the converter.
+	protected  $credits = 'Mantis -> TBG converter &copy; Joshua Dickerson & Jeremy Darwood';
+
 	protected $mbt_db_prefix;
 
 	// What steps shall we take.
@@ -897,21 +901,22 @@ class tbg_converter_wrapper
 {
 	protected $page_title = 'Mantis to The Bug Genie converter';
 	protected $headers = array();
+	protected $errors = array();
+	protected $steps = array();
+	protected $step = 0;
+	protected $substep = 0;
+	protected $time = 0;
+	protected $credits = array();
 
 	/** 
 	 * Start the HTML.
 	*/
-	public function __construct($no_html = false)
+	public function __construct($steps, $credits = array())
 	{
-		// Do nothing!
-		if (!empty($no_html))
-			return;
+		$this->steps = $steps;
+		$this->credits = $credits;
 
-		// Some headers.
-		$this->printHeader();
-
-		// Upper part of theme.
-		$this->upper();
+		ob_start();
 	}
 
 	/** 
@@ -921,6 +926,17 @@ class tbg_converter_wrapper
 	{
 		if ($is_cli)
 			exit("\nConversion completed");
+
+		$contents = ob_get_contents();
+		ob_end_clean();
+
+		// Some headers.
+		$this->printHeader();
+
+		// Upper part of theme.
+		$this->upper();
+
+		echo $contents;
 
 		$this->lower();
 		exit;
@@ -955,6 +971,16 @@ class tbg_converter_wrapper
 	}
 
 	/*
+	* Set the title.
+	* @param $title: The page title to set
+	*/
+	public function updateData($data)
+	{
+		foreach ($data as $key => $value)
+			$this->{$key} = $value;
+	}
+
+	/*
 	* Return a json array.
 	* @param $data: The json data.
 	*/
@@ -967,20 +993,13 @@ class tbg_converter_wrapper
 	}
 
 	/*
-	* We have some new data!.
-	* @param $data: The json data.
+	* Set the title.
+	* @param $errors: We have some errors!
 	*/
-	public function steps($steps)
+	public function errors($errors)
 	{
-		echo '<ol>';
-
-		foreach ($steps as $id_step => $step)
-			echo '
-				<li id="step', $id_step, '"><span class="name">', $step[0], '</span><span class="progress"></span><span class="progress_percent" style="display: none;">0%</span></li>';
-
-		echo '</ol>';
+		$this->errors = array_merge($this->errors, $errors);
 	}
-
 
 	/*
 	* The upper part of the theme.
@@ -995,15 +1014,204 @@ class tbg_converter_wrapper
 	<title>', $this->page_title, '</title>
 	<style type="text/css">
 	<!--
+	html, body
+	{
+		height: 100%;
+	}
+	body
+	{
+		/* Copy SMFs background gradient if we are cool enough */
+		background-color: #E9EEF2;
+		filter: progid:DXImageTransform.Microsoft.gradient(startColorstr=\'#375976\', endColorstr=\'#e9eef2\');
+		background: -webkit-gradient(linear, left top, left bottom, from(#375976), to(#e9eef2));
+		background: -moz-linear-gradient(top,  #375976,  #e9eef2);
+		background: -o-linear-gradient(#375976, #e9eef2 30em);
+		font-family: "Geneva", "verdana", sans-serif;
+
+		padding: 1em 4em 0 4em;
+		margin: auto;
+		min-width: 50em;
+	}
+
+	#main_block
+	{
+		border: 2px solid #ffffff;
+		border-top-left-radius: 10px;
+		border-top-right-radius: 10px;
+
+		/* Copy SMFs background gradient if we are cool enough */
+		background-color: #c9d7e7;
+		filter: progid:DXImageTransform.Microsoft.gradient(startColorstr=\'#c9d7e7\', endColorstr=\'#fcfdfe\');
+		background: -webkit-gradient(linear, left top, left bottom, from(#c9d7e7), to(#fcfdfe));
+		background: -moz-linear-gradient(top,  #c9d7e7,  #fcfdfe);
+		background: -o-linear-gradient(#c9d7e7, #fcfdfe 10em);
+
+	}
+	#logo_block
+	{
+		padding: 0.3em 0 0.3em 0;
+		margin: 0 0 0 1em;
+	}
+	#logo_block h1
+	{
+		padding: 0;
+		margin: 0;
+
+		color: #334466;
+		text-decoration: bold;
+		font-size: 1.4em;
+		line-height: 45px;
+	}
+	#content_block
+	{
+		margin: 0 0.3em 0 0.3em;
+		padding: 1em;
+
+		border-top-left-radius: 10px;
+		border-top-right-radius: 10px;
+
+		/* Copy SMFs background gradient if we are cool enough */
+		background-color: #c3cfde;
+		filter: progid:DXImageTransform.Microsoft.gradient(startColorstr=\'#c3cfde\', endColorstr=\'#fcfdfe\');
+		background: -webkit-gradient(linear, left top, left bottom, from(#c3cfde), to(#fcfdfe));
+		background: -moz-linear-gradient(top,  #c3cfde,  #fcfdfe);
+		background: -o-linear-gradient(#c3cfde, #fcfdfe 5em);
+
+	}
+
+	#footer
+	{
+		/* Copy SMFs background gradient if we are cool enough */
+		filter: progid:DXImageTransform.Microsoft.gradient(startColorstr=\'#f3f6f9\', endColorstr=\'#e1e9f3\');
+		background: -webkit-gradient(linear, left top, left bottom, from(#f3f6f9), to(#e1e9f3));
+		background: -moz-linear-gradient(top,  #f3f6f9,  #e1e9f3);
+		background: -o-linear-gradient(#f3f6f9, #e1e9f3);
+
+		border-left: 1px solid white;
+		border-right: 1px solid white;
+
+		border-bottom-left-radius: 10px;
+		border-bottom-right-radius: 10px;
+
+		padding: 0.5em 0;
+		margin: 0;
+
+		text-align: center;
+		font-size: 70%;
+	}
+	#footer span
+	{
+		padding-left: 5em;
+	}
+
+	dl
+	{
+		clear: right;
+		overflow: auto;
+
+		border: 1px solid #bbb;
+		background: #f5f5f0;
+
+		margin: 0 0 0 0;
+		padding: 0.5em;
+	}
+	dl dt
+	{
+		width: 40%;
+		float: left;
+		margin: 0 0 10px 0;
+		padding: 0;
+		clear: both;
+	}
+	dl dd
+	{
+		width: 56%;
+		float: right;
+		overflow: auto;
+		margin: 0 0 3px 0;
+		padding: 0;
+	}
+	dl input[type=text], dl input[type=password]
+	{
+		width: 25em;
+	}
+
+	#steps .waiting, #steps .done, #steps .current
+	{
+		border-radius: 5px;
+	}
+	#steps li
+	{
+		margin: 0.5em;
+		padding: 0.5em;
+	}
+	#steps li span
+	{
+		color: white;
+		text-decoration: bold;
+	}
+	#steps li .name
+	{
+		width: 30em;
+		min-width: 30em;
+		padding-right: 3em;
+	}
+	#steps .waiting, #steps .done
+	{
+		background-color: #5a6c85;
+	}
+	#steps .current
+	{
+		background-color: #fd9604;
+	}
+
+	#steps li .progress_bar, #steps li .progress_status
+	{
+		position: absolute;
+		left: 10em;
+		padding-left: 10em;
+	}
+	#steps li .progress_bar .progress_box
+	{
+		border: 1px solid black;
+		width: 20em;
+		display: block;
+		background-color: white;
+		padding: 1px;
+		border-radius: 5px;
+	}
+	#steps li .progress_bar .progress_box .progress_percent
+	{
+		background-color: red;
+		display: block;
+		border-radius: 5px;
+		padding-left: 0.3em;
+		color: black;
+		text-decoration: bold;
+	}
 	-->
 	</style>
 </head>
 <body>
-	<div>
-		<div style="padding: 10px; padding-right: 0px; padding-left: 0px; width:98% ">
-			<div style="padding-left: 200px; padding-right: 0px;">
-				<h1>', $this->page_title, '</h1>
-				<div class="panel" style="padding-right: 0px;  white-space: normal; overflow: hidden;">';
+	<div id="main_block">
+		<div id="logo_block">
+			<h1>', $this->page_title, '</h1>
+		</div>
+		<div id="content_block">';
+
+		if (!empty($this->errors))
+		{
+			echo '
+			<div class="error">
+				<ul>
+					<li>', implode("</li>\n\t\t\t\t\t<li>", $this->errors), '
+					</li>
+				</ul>
+			</div>';
+		}
+
+		echo '
+			<div class="panel">';
 	}
 
 	/*
@@ -1013,10 +1221,10 @@ class tbg_converter_wrapper
 	public function lower()
 	{
 		echo '
-				</div>
 			</div>
 		</div>
 	</div>
+		<div id="footer"><span>', implode('</span><span>', $this->credits), '</span></div>
 </body></html>';
 
 	}
@@ -1028,7 +1236,7 @@ class tbg_converter_wrapper
 	public function showSettings($settings)
 	{
 		echo '
-				<form action="', $_SERVER['PHP_SELF'], '" method="post" id="showSettings">
+				<form action="', $_SERVER['PHP_SELF'], '" method="post">
 					<dl>';
 
 		foreach ($settings as $key => $data)
@@ -1038,7 +1246,7 @@ class tbg_converter_wrapper
 						<dd id="', $key, '_field">';
 
 			if ($data['type'] == 'textarea')
-				echo '<textarea name="', $key, '"></textarea>';
+				echo '<textarea name="', $key, '">', isset($data['default']) ? $data['default'] : '', '</textarea>';
 			elseif ($data['type'] == 'select')
 			{
 				echo '<select name="', $key, '">';
@@ -1050,19 +1258,56 @@ class tbg_converter_wrapper
 				echo '
 						</select>';
 			}
+			elseif ($data['type'] == 'password')
+				echo '<input type="password" name="', $key, '" />';
 			else
-				echo '<input type="', $data['type'] == 'password' ? 'password' : 'text', '" name="', $key, '" />';
+				echo '<input type="text" name="', $key, '"', isset($data['default']) ? ' value="' . $data['default'] . '"' : '', ' />';
 
 			echo '</dd>';
 		}
 
 		echo '
-						<dt><input type="submit" value="Start conversion" /></dt>
+						<dt><input name="save" type="submit" value="Start conversion" /></dt>
 					</dl>
 				</form>';
 	}
 
+	/*
+	* We have some new data!.
+	* @param $data: The json data.
+	*/
+	public function steps()
+	{
+		echo '<ol id="steps">';
 
+		foreach ($this->steps as $id_step => $step)
+		{
+			echo '
+				<li id="step', $id_step, '" class="';
+
+			if ($id_step < $this->step)
+				echo 'done';
+			elseif ($id_step == $this->step)
+				echo 'current';
+			else
+				echo 'waiting';
+
+			echo '" ><span class="name">', $step[0], '</span><span class="progress_bar">';
+
+			// The progress bar.
+			if ($id_step == $this->step)
+				echo '<span class="progress_box"><span class="progress_percent" id="progress_percent" style="width: 1%;">100%</span></span>';
+
+			echo '</span><span class="progress_status">';
+
+			if ($id_step < $this->step)
+				echo 'completed';
+
+			echo '</span></li>';
+		}
+
+		echo '</ol>';
+	}
 }
 
 $convert = new mbt_to_tbg();
