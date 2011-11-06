@@ -35,17 +35,13 @@ class tbg_converter
 	protected $db_user = 'tb3';
 	protected $db_pass = '';
 
-	protected $mbt_db_name = 'mantis';
-	protected $mbt_db_table_prefix = 'mantis_';
-
+	// The database prefixes (including the database).
+	protected $tbg_db_prefix;
 	protected $tbg_db_name = 'tbg';
 	protected $tbg_db_table_prefix = 'tbg3_';
 
 	// Scope (usually just 1)
 	protected $tbg_scope = 1;
-
-	// The database prefixes (including the database).
-	protected $tbg_db_prefix;
 
 	// The start timer.
 	protected $start_time = 0;
@@ -136,7 +132,7 @@ class tbg_converter
 		{
 			// No special regex?
 			if (!isset($setting['cli_regex']))
-				$setting['cli_regex'] = '~^--' . $key . '=([^--]+)~i';
+				$setting['cli_regex'] = '~--' . $key . '=([^\s]+)[\s+--]?~i';
 
 			foreach ($_SERVER['argv'] as $i => $arg)
 			{
@@ -151,6 +147,9 @@ class tbg_converter
 			if ($setting['required'] && empty($_POST[$key]))
 				exit('The argument, ' . $key . ', is required to continue.');
 		}
+
+		// validate the settings.
+		$errors = $this->setSettings();
 	}
 
 	/**
@@ -221,7 +220,7 @@ class tbg_converter
 	public function loadSettings()
 	{
 		// Lets check our session.
-		if (session_id() == '')
+		if (session_id() == '' && empty($this->is_cli))
 			session_start();
 
 		if (isset($_SESSION['tbg_converter']))
@@ -331,7 +330,8 @@ class tbg_converter
 		}
 		catch (PDOException $e)
 		{
-			exit('Connection failed' . $e->getMessage());
+			echo $this->db_dsn;
+			exit('TBG Connection failed: ' . $e->getMessage() . "\n");
 		}
 
 		// Set the prefixes.
@@ -372,6 +372,8 @@ class tbg_converter
 	*/
 	function updateStep($step)
 	{
+		$step = str_replace('doStep', '', $step) + 1;
+
 		$_GET['step'] = (int) $step;
 
 		$this->step = (int) $step;
@@ -417,7 +419,7 @@ class tbg_converter
 		$this->updateSubStep($substep + $max_step_size);
 
 		// Hold on, we had less results than we should have.
-		if ($max_step_size < $count)
+		if ($max_step_size > $count)
 			$this->updateStep($function);
 
 		// CLI conversions can just continue.
@@ -466,6 +468,8 @@ class mbt_to_tbg extends tbg_converter
 	// Credits for this part of the converter.
 	protected  $credits = 'Mantis -> TBG converter &copy; Joshua Dickerson & Jeremy Darwood';
 
+	protected $mbt_db_name = 'mantis';
+	protected $mbt_db_table_prefix = 'mantis_';
 	protected $mbt_db_prefix;
 
 	// What steps shall we take.
@@ -531,7 +535,7 @@ class mbt_to_tbg extends tbg_converter
 		}
 		catch (PDOException $e)
 		{
-			exit('Connection failed' . $e->getMessage());
+			exit('Mantis Connection failed: ' . $e->getMessage() . "\n");
 		}
 
 		$this->setDatabasePrefix();
@@ -633,7 +637,7 @@ class mbt_to_tbg extends tbg_converter
 		$query = '
 			SELECT
 				id, name, description,
-				(CASE WHEN enabled = 0 THEN 1 ELSE 0) AS locked
+				(CASE enabled WHEN 0 THEN 1 ELSE 0 END) AS locked
 				FROM ' . $this->mbt_db_prefix . 'project_table
 			LIMIT ' . $step_size . ' OFFSET ' . $substep;
 
@@ -691,9 +695,9 @@ class mbt_to_tbg extends tbg_converter
 		$query = '
 			SELECT
 				id, name
-				FROM ' . $this->mbt_db_prefix . 'builds';
+				FROM ' . $this->tbg_db_prefix . 'builds';
 		$builds = array();
-		foreach ($this->tbg_db->query($sql) as $row)
+		foreach ($this->tbg_db->query($query) as $row)
 			$builds[$row['name']] = $row['id'];
 
 		$query = '
@@ -733,7 +737,7 @@ class mbt_to_tbg extends tbg_converter
 		$query = '
 			SELECT
 				id, name
-				FROM ' . $this->mbt_db_prefix . 'builds';
+				FROM ' . $this->tbg_db_prefix . 'builds';
 		$builds = array();
 		foreach ($this->tbg_db->query($query) as $row)
 			$builds[$row['name']] = $row['id'];
@@ -741,23 +745,24 @@ class mbt_to_tbg extends tbg_converter
 		$query = '
 			SELECT
 				bt.id, bt.project_id, bt.summary AS title, bt.handler_id AS assigned_to, bt.duplicate_id AS duplicate_of,
-				bt.date_submitted AS posted, bt.last_updated, bt.status AS state, bt.cagegory_id AS category,
+				bt.date_submitted AS posted, bt.last_updated, bt.status AS state, bt.category_id AS category, bt.resolution,
 				bt.priority,
 				bt.severity /* NEEDS FIXED */,
 				(CASE
-					WHEN bt.reproducability = 10 THEN 12
-					WHEN bt.reproducability > 30 AND bt.reproducability < 70 THEN 11
-					WHEN bt.reproducability > 70 AND bt.reproducability < 90 THEN 9
-					ELSE 0) AS reproducability,
-					IFNULL(btt.steps_to_reproduce, "") AS reproduction_steps
-					IFNULL(btt.description, "") AS description,
-					version
+					WHEN bt.reproducibility = 10 THEN 12
+					WHEN bt.reproducibility > 30 AND bt.reproducibility < 70 THEN 11
+					WHEN bt.reproducibility > 70 AND bt.reproducibility < 90 THEN 9
+					ELSE 0
+				END) AS reproducability,
+				IFNULL(btt.steps_to_reproduce, "") AS reproduction_steps,
+				IFNULL(btt.description, "") AS description,
+				version
 				FROM ' . $this->mbt_db_prefix . 'bug_table AS bt
 					LEFT JOIN ' . $this->mbt_db_prefix . 'bug_text_table AS btt ON (btt.id = bt.bug_text_id)
 			LIMIT ' . $step_size . ' OFFSET ' . $substep;
 
 		$i = 0;
-		foreach ($this->mantis_db->query($sql) as $row)
+		foreach ($this->mantis_db->query($query) as $row)
 		{
 			$this->tbg_db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'issues (id, project_id, title, assigned_to, duplicate_of, posted, last_updated, state, category, resolution, priority, severity, reproducability)
@@ -769,7 +774,7 @@ class mbt_to_tbg extends tbg_converter
 				$this->tbg_db->query('
 					INSERT INTO (' . $this->tbg_db_prefix . 'builds (name) VALUES (' . $row['version'] . ')');
 
-				$builds[$row['version']] = $this->db->lastInsertId();	
+				$builds[$row['version']] = $this->tbg_db->lastInsertId();	
 			}
 
 			$affect_id = $builds[$row['version']];
@@ -797,7 +802,7 @@ class mbt_to_tbg extends tbg_converter
 				bn.id, bn.bug_id AS target_id, bn.last_modified AS updated, bn.date_submitted AS posted,
 				bn.reporter_id AS updated_by, bn.reporter_id AS posted_by, bnt.note AS content
 				FROM ' . $this->mbt_db_prefix . 'bugnote_table AS bn
-					INNER JOIN ' . $this->mbt_db_prefix . 'butnote_text_table AS bnt ON (bn.id = bnt.bug_text_id)
+					INNER JOIN ' . $this->mbt_db_prefix . 'bugnote_text_table AS bnt ON (bn.id = bnt.id)
 			LIMIT ' . $step_size . ' OFFSET ' . $substep;
 
 		$i = 0;
@@ -825,7 +830,7 @@ class mbt_to_tbg extends tbg_converter
 		$query = '
 			SELECT
 				source_bug_id AS parent_id, destination_bug_id AS child_id
-				FROM ' . $this->mbt_db_prefix . 'bug_relationships_table
+				FROM ' . $this->mbt_db_prefix . 'bug_relationship_table
 			LIMIT ' . $step_size . ' OFFSET ' . $substep;
 
 		$i = 0;
