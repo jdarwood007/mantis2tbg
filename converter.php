@@ -644,9 +644,12 @@ class mbt_to_tbg extends tbg_converter
 		$i = 0;
 		foreach ($this->mantis_db->query($query) as $row)
 		{
-			$this->tbg_db->query('
+$temp =			$this->tbg_db->quote('
 				INSERT INTO ' . $this->tbg_db_prefix . 'projects (id, name, locked, description)
 				VALUES (' . $row['id'] . ', "' . $row['name'] . '", ' . $row['locked'] . ', "' . $row['description'] . '")');
+
+echo str_replace('\"', '"', $temp);
+exit("\n");
 
 			++$i;
 		}
