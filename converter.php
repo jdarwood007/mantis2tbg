@@ -628,7 +628,7 @@ class mbt_to_tbg extends tbg_converter
 			$password = $this->getRandomString();
 
 			$this->tbg_db->query('
-				INSERT INTO ' . $this->tbg_db_prefix . 'users (id, username, buddyname, realname, email, password, enabled, lastseen, joined)
+				REPLACE INTO ' . $this->tbg_db_prefix . 'users (id, username, buddyname, realname, email, password, enabled, lastseen, joined)
 				VALUES (' . $row['id'] . ', "' . $row['username'] . '", "' . $row['buddyname'] . '", "' . $row['realname'] . '", "' . $row['email'] . '", "' . $password . '", ' . $row['enabled'] . ', ' . $row['lastseen'] . ', ' . $row['joined'] . ')');
 
 			++$i;
@@ -657,12 +657,12 @@ class mbt_to_tbg extends tbg_converter
 		foreach ($this->mantis_db->query($query) as $row)
 		{
 			$this->tbg_db->query('
-				INSERT INTO ' . $this->tbg_db_prefix . 'projects (id, name, locked, description)
-				VALUES (' . $row['id'] . ', "' . $row['name'] . '", ' . $row['locked'] . ', "' . $row['description'] . '")');
+				REPLACE INTO ' . $this->tbg_db_prefix . 'projects (id, name, locked, description, scope, workflow_scheme_id, issuetype_scheme_id)
+				VALUES (' . $row['id'] . ', "' . $row['name'] . '", ' . $row['locked'] . ', "' . $row['description'] . '", 1, 1, 1)');
 
 			// Add the default permissions.
 			$this->tbg_db->query('
-				INSERT INTO ' . $this->tbg_db_prefix . 'permissions (permission_type, target_id, allowed, module, uid, gid, tid, scope) VALUES
+				REPLACE INTO ' . $this->tbg_db_prefix . 'permissions (permission_type, target_id, allowed, module, uid, gid, tid, scope) VALUES
 					("canseeproject", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
 					("canseeprojecthierarchy", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
 					("canmanageproject", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
@@ -711,7 +711,7 @@ class mbt_to_tbg extends tbg_converter
 				continue;
 
 			$this->tbg_db->query('
-				INSERT INTO ' . $this->tbg_db_prefix . 'listtypes (name, itemtype, scope)
+				REPLACE INTO ' . $this->tbg_db_prefix . 'listtypes (name, itemtype, scope)
 				VALUES ("' . $row['name'] . '", "category", 1)');
 
 			++$i;
@@ -751,7 +751,7 @@ class mbt_to_tbg extends tbg_converter
 				continue;
 
 			$this->tbg_db->query('
-				INSERT INTO ' . $this->tbg_db_prefix . 'builds (name, isreleased, project) VALUES ("' . $row['version'] . '", ' . $row['isreleased'] . ', ' . $row['project'] . ')');
+				REPLACE INTO ' . $this->tbg_db_prefix . 'builds (name, isreleased, project) VALUES ("' . $row['version'] . '", ' . $row['isreleased'] . ', ' . $row['project'] . ')');
 
 			$builds[$row['version']] = $this->tbg_db->lastInsertId();
 
@@ -783,7 +783,10 @@ class mbt_to_tbg extends tbg_converter
 		$query = '
 			SELECT
 				bt.id, bt.project_id, bt.summary AS title, bt.handler_id AS assigned_to, bt.duplicate_id AS duplicate_of,
-				bt.date_submitted AS posted, bt.last_updated, bt.status AS state, bt.category_id AS category, bt.resolution,
+				bt.date_submitted AS posted, bt.last_updated,
+				0 AS state /* NEEDS FIXED */,
+				
+				bt.category_id AS category, bt.resolution,
 				bt.priority,
 				bt.severity /* NEEDS FIXED */,
 				(CASE
@@ -803,7 +806,7 @@ class mbt_to_tbg extends tbg_converter
 		foreach ($this->mantis_db->query($query) as $row)
 		{
 			$this->tbg_db->query('
-				INSERT INTO ' . $this->tbg_db_prefix . 'issues (id, project_id, title, assigned_to, duplicate_of, posted, last_updated, state, category, resolution, priority, severity, reproducability)
+				REPLACE INTO ' . $this->tbg_db_prefix . 'issues (id, project_id, title, assigned_to, duplicate_of, posted, last_updated, state, category, resolution, priority, severity, reproducability)
 				VALUES (' . $row['id'] . ', ' . $row['project_id'] . ', "' . $row['title'] . '", ' . $row['assigned_to'] . ', ' . $row['duplicate_of'] . ', ' . $row['posted'] . ', ' . $row['last_updated'] . ', ' . $row['state'] . ', ' . $row['category'] . ',  ' . $row['resolution'] . ', ' . $row['priority'] . ', ' . $row['severity'] . ', ' . $row['reproducability'] . ')
 			');
 
@@ -811,7 +814,7 @@ class mbt_to_tbg extends tbg_converter
 			if (!isset($builds[$row['version']]))
 			{
 				$this->tbg_db->query('
-					INSERT INTO (' . $this->tbg_db_prefix . 'builds (name, project) VALUES (' . $row['version'] . ', ' . $row['project_id'] . ')');
+					REPLACE INTO (' . $this->tbg_db_prefix . 'builds (name, project) VALUES (' . $row['version'] . ', ' . $row['project_id'] . ')');
 
 				$builds[$row['version']] = $this->tbg_db->lastInsertId();	
 			}
@@ -819,7 +822,7 @@ class mbt_to_tbg extends tbg_converter
 			$affect_id = $builds[$row['version']];
 
 			$this->tbg_db->query('
-				INSERT INTO (' . $this->tbg_db_prefix . 'issueaffectsbuild (id, build) VALUES(' . $row['id'] . ', ' . $affect_id . ')');
+				REPLACE INTO (' . $this->tbg_db_prefix . 'issueaffectsbuild (id, build) VALUES(' . $row['id'] . ', ' . $affect_id . ')');
 
 			++$i;
 		}
@@ -848,7 +851,7 @@ class mbt_to_tbg extends tbg_converter
 		foreach ($this->mantis_db->query($query) as $row)
 		{
 			$this->tbg_db->query('
-				INSERT INTO ' . $this->tbg_db_prefix . 'comments (id, target_id, updated, posted, updated_by, posted_by, content)
+				REPLACE INTO ' . $this->tbg_db_prefix . 'comments (id, target_id, updated, posted, updated_by, posted_by, content)
 				VALUES (' . $row['id'] . ', ' . $row['target_id'] . ', ' . $row['updated'] . ', ' . $row['posted'] . ', ' . $row['updated_by'] . ', ' . $row['posted_by'] . ', "' . $row['content'] . '")');
 
 			++$i;
@@ -876,7 +879,7 @@ class mbt_to_tbg extends tbg_converter
 		foreach ($this->mantis_db->query($query) as $row)
 		{
 			$this->tbg_db->query('
-				INSERT INTO ' . $this->tbg_db_prefix . 'issuerelations (parent_id, child_id)
+				REPLACE INTO ' . $this->tbg_db_prefix . 'issuerelations (parent_id, child_id)
 				VALUES (' . $row['parent_id'] . ', ' . $row['child_id'] . ')');
 
 			++$i;
@@ -929,7 +932,7 @@ class mbt_to_tbg extends tbg_converter
 	{
 		// Get the basics - we'll fix it up in a minute.
 		$this->db->query('
-			INSERT INTO ' . $this->tbg_prefix . 'issues
+			REPLACE INTO ' . $this->tbg_prefix . 'issues
 				id, project_id, title, assigned_to, duplicate_of, posted, last_updated,
 				state, category, resolution, priority, severity, reproducability
 			SELECT bt.id, bt.project_id, bt.summary AS title, bt.handler_id AS assigned_to,
@@ -999,7 +1002,7 @@ class mbt_to_tbg extends tbg_converter
 	public function getComments()
 	{
 		$this->db->query('
-			INSERT INTO ' . $this->tbg_prefix . 'comments
+			REPLACE INTO ' . $this->tbg_prefix . 'comments
 				target_id, updated, posted, updated_by, posted_by, content			
 			SELECT bn.bug_id AS target_id, bn.last_modified AS updated, bn.date_submitted AS posted,
 				bn.reporter_id AS updated_by, bn.reporter_id AS posted_by, btt.note AS content
@@ -1013,7 +1016,7 @@ class mbt_to_tbg extends tbg_converter
 	public function getProjects()
 	{
 		$this->db->query('
-			INSERT INTO ' . $this->tbg_prefix . 'projects
+			REPLACE INTO ' . $this->tbg_prefix . 'projects
 				id, name, locked, description	
 			SELECT id, name, enabled AS locked, description
 			FROM ' . $this->mtb_prefix . 'project_table'
