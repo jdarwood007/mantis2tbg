@@ -23,6 +23,14 @@ ini_set('display_errors', 1);
 * Add js to support ajax
 * Add ajax support
 * Test
+* The version needs split into major, minor and revision.. Fun.
+*/
+
+// exit(var_dump($this->tbg_db->errorInfo()));
+/*
+* @TODO Known Bugs
+* Converting categories doesn't sort them properly for which category they existed.
+* Converting versions doesn't work when repeated due to the data existing in builds already and is skipped.  Step 0 anyone?
 */
 
 class tbg_converter
@@ -378,6 +386,9 @@ class tbg_converter
 
 		$this->step = (int) $step;
 
+		// Reset.
+		$this->updateSubStep(0);
+
 		return true;
 	}
 
@@ -644,12 +655,9 @@ class mbt_to_tbg extends tbg_converter
 		$i = 0;
 		foreach ($this->mantis_db->query($query) as $row)
 		{
-$temp =			$this->tbg_db->quote('
+			$this->tbg_db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'projects (id, name, locked, description)
 				VALUES (' . $row['id'] . ', "' . $row['name'] . '", ' . $row['locked'] . ', "' . $row['description'] . '")');
-
-echo str_replace('\"', '"', $temp);
-exit("\n");
 
 			++$i;
 		}
@@ -659,10 +667,17 @@ exit("\n");
 
 	/**
 	* Convert Categories.
-	*
+	* WARNING: RUNNING THIS MULTIPLE TIMES MAY CAUSE DUPLICATE ENTRIES.
 	*/
 	function doStep3()
 	{
+		// This attempts to remove extras added by repeated conversions.
+		$this->tbg_db->query('
+			DELETE FROM ' . $this->tbg_db_prefix . 'listtypes
+			WHERE id NOT IN (1,2,3)
+				AND itemtype = "category"');
+
+
 		$step_size = 500;
 		$substep = $this->getSubStep(__FUNCTION__);
 
@@ -675,9 +690,13 @@ exit("\n");
 		$i = 0;
 		foreach ($this->mantis_db->query($query) as $row)
 		{
+			// Mantis has some empty category names.
+			if (empty($row['name']) || trim($row['name']) == '')
+				continue;
+
 			$this->tbg_db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'listtypes (name, itemtype, scope)
-				VALUES (' . $row['name'] . ', "category", 1)');
+				VALUES ("' . $row['name'] . '", "category", 1)');
 
 			++$i;
 		}
@@ -705,20 +724,20 @@ exit("\n");
 
 		$query = '
 			SELECT
-				id, project_id, version, released AS isreleased
+				id, project_id, version, released AS isreleased, project_id AS project
 				FROM ' . $this->mbt_db_prefix . 'project_version_table
 			LIMIT ' . $step_size . ' OFFSET ' . $substep;
 
 		$i = 0;
 		foreach ($this->mantis_db->query($query) as $row)
 		{
-			if (isset($builds[$version]))
+			if (isset($builds[$row['version']]))
 				continue;
 
 			$this->tbg_db->query('
-				INSERT INTO (' . $this->tbg_db_prefix . 'builds (name) VALUES (' . $row['version'] . ')');
+				INSERT INTO ' . $this->tbg_db_prefix . 'builds (name, isreleased, project) VALUES ("' . $row['version'] . '", ' . $row['isreleased'] . ', ' . $row['project'] . ')');
 
-			$builds[$row['version']] = $this->db->lastInsertId();
+			$builds[$row['version']] = $this->tbg_db->lastInsertId();
 
 			++$i;
 		}
@@ -769,13 +788,14 @@ exit("\n");
 		{
 			$this->tbg_db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'issues (id, project_id, title, assigned_to, duplicate_of, posted, last_updated, state, category, resolution, priority, severity, reproducability)
-				VALUES (' . $row['id'] . ', ' . $row['project_id'] . ', "' . $row['title'] . '", ' . $row['assigned_to'] . ', ' . $row['duplicate_of'] . ', ' . $row['posted'] . ', ' . $row['last_updated'] . ', ' . $row['state'] . ', ' . $row['category'] . ', ' . $row['category'] . ', ' . $row['resolution'] . ', ' . $row['priority'] . ', ' . $row['severity'] . ', ' . $row['reproducability'] . ')
+				VALUES (' . $row['id'] . ', ' . $row['project_id'] . ', "' . $row['title'] . '", ' . $row['assigned_to'] . ', ' . $row['duplicate_of'] . ', ' . $row['posted'] . ', ' . $row['last_updated'] . ', ' . $row['state'] . ', ' . $row['category'] . ',  ' . $row['resolution'] . ', ' . $row['priority'] . ', ' . $row['severity'] . ', ' . $row['reproducability'] . ')
 			');
 
+			// This attempts to find any versions that got missed, but isn't accurate.
 			if (!isset($builds[$row['version']]))
 			{
 				$this->tbg_db->query('
-					INSERT INTO (' . $this->tbg_db_prefix . 'builds (name) VALUES (' . $row['version'] . ')');
+					INSERT INTO (' . $this->tbg_db_prefix . 'builds (name, project) VALUES (' . $row['version'] . ', ' . $row['project_id'] . ')');
 
 				$builds[$row['version']] = $this->tbg_db->lastInsertId();	
 			}
