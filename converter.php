@@ -617,7 +617,7 @@ class mbt_to_tbg extends tbg_converter
 
 			$this->tbg_db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'users (id, username, buddyname, realname, email, password, enabled, lastseen, joined)
-				VALUES (' . $row['id'] . ', "' . $row['username'] . '", "' . $row['buddyname'] . '", "' . $row['realname'] . '", "' . $row['email'] . '", "' . $password . '", ' . $row['enabled'] . ', ' . $row['username'] . ', ' . $row['joined'] . ')');
+				VALUES (' . $row['id'] . ', "' . $row['username'] . '", "' . $row['buddyname'] . '", "' . $row['realname'] . '", "' . $row['email'] . '", "' . $password . '", ' . $row['enabled'] . ', ' . $row['lastseen'] . ', ' . $row['joined'] . ')');
 
 			++$i;
 		}
