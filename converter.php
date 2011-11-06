@@ -31,6 +31,7 @@ ini_set('display_errors', 1);
 * @TODO Known Bugs
 * Converting categories doesn't sort them properly for which category they existed.
 * Converting versions doesn't work when repeated due to the data existing in builds already and is skipped.  Step 0 anyone?
+* Doesn't add the default wiki pages upon creating a project.
 */
 
 class tbg_converter
@@ -658,6 +659,21 @@ class mbt_to_tbg extends tbg_converter
 			$this->tbg_db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'projects (id, name, locked, description)
 				VALUES (' . $row['id'] . ', "' . $row['name'] . '", ' . $row['locked'] . ', "' . $row['description'] . '")');
+
+			// Add the default permissions.
+			$this->tbg_db->query('
+				INSERT INTO ' . $this->tbg_db_prefix . 'permissions (permission_type, target_id, allowed, module, uid, gid, tid, scope) VALUES
+					("canseeproject", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
+					("canseeprojecthierarchy", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
+					("canmanageproject", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
+					("page_project_allpages_access", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
+					("canvoteforissues", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
+					("canlockandeditlockedissues", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
+					("cancreateandeditissues", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
+					("caneditissue", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
+					("caneditissuecustomfields", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
+					("canaddextrainformationtoissues", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
+					("canpostseeandeditallcomments", " . $row["id"] . ", 1, "core", 1, 0, 0, 1)');
 
 			++$i;
 		}
