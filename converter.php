@@ -31,9 +31,8 @@ class tbg_converter
 	protected $main_credits = 'TBG converter &copy; Joshua Dickerson & Jeremy Darwood';
 
 	// The host, user, and pass must be on the same server
-	protected $db_driver = 'mysql';
-	protected $db_host = 'localhost';
-	protected $db_user = '';
+	protected $db_dsn = 'mysql:host=localhost;dbname=tbg3';
+	protected $db_user = 'tb3';
 	protected $db_pass = '';
 
 	protected $mbt_db_name = 'mantis';
@@ -160,7 +159,6 @@ class tbg_converter
 	*/
 	public function doConversion()
 	{
-		$this->setDatabasePrefix();
 		$this->getDatabaseConnection();
 
 		// Now restart.
@@ -210,7 +208,7 @@ class tbg_converter
 	public function converterSettings()
 	{
 		return array(
-			'tbg_loc' => array('name' => 'The Bug Genie location', 'type' => 'text', 'required' => true, 'default' => dirname(__FILE__), 'validate' => 'return file_exists($data) && file_exists($data . \'/index.php\');'),
+			'tbg_loc' => array('name' => 'The Bug Genie Core location', 'type' => 'text', 'required' => true, 'default' => dirname(__FILE__), 'validate' => 'return file_exists($data) && file_exists($data . \'/b2db_bootstrap.inc.php\');'),
 			// @TODO: Make this validate the password.
 			'tbg_db_pass' => array('name' => 'The Bug Genie database password', 'type' => 'password', 'required' => true, 'validate' => 'return true;',),
 		);
@@ -233,7 +231,7 @@ class tbg_converter
 		}
 
 		// Load some from the url.
-		$this->step = (int) $_GET['step'];
+		$this->step = isset($_GET['step']) ? (int) $_GET['step'] : 1;
 
 		$this->substep = isset($_GET['substep']) ? (int) $_GET['substep'] : 0;
 	}
@@ -275,21 +273,69 @@ class tbg_converter
 	}
 
 	/**
+	 * Sets the database username from bootstrap.
+	 * @param string $db_user = The database user name.
+	 */
+	public function setUname($db_user)
+	{
+		$this->db_user = $db_user;
+
+		return true;
+	}
+
+	/**
+	 * Sets the database password from bootstrap.
+	 * @param string $db_pass = The database user's password.
+	 */
+	public function setPasswd($db_pass)
+	{
+		$this->db_pass = $db_pass;
+
+		return true;
+	}
+
+	/**
 	 * Set the prefix that will be used prior to every reference of a table
 	 */
-	public function setTBGDatabasePrefix()
+	public function setTablePrefix()
 	{
 		$this->tbg_db_prefix = $this->tbg_db_name . '.' . $this->tbg_db_table_prefix;
 
 		return true;
 	}
-	/**
 
+	/**
+	 * Set the DSN for our database connect
+	 * @param string $db_dsn = The DSN used for database connections.
+	 */
+	public function setDSN($db_dsn)
+	{
+		$this->db_dsn = $db_dsn;
+
+		return true;
+	}
+
+
+	/**
 	 * Establish a database connection
 	 */
 	function getDatabaseConnection()
 	{
-		$this->db = new PDO ($this->db_driver . ':host=' . $this->db_host, $this->db_user, $this->db_pass);
+		// Lets locate TBG Core
+		require_once($this->tbg_loc . '/b2db_bootstrap.inc.php');
+
+		// We first try to setup TBG connection.
+		try
+		{
+			$this->tbg_db = new PDO ($this->db_dsn, $this->db_user, $this->db_pass);
+		}
+		catch (PDOException $e)
+		{
+			exit('Connection failed' . $e->getMessage());
+		}
+
+		// Set the prefixes.
+		$this->setTablePrefix();
 
 		return true;
 	}
@@ -308,7 +354,7 @@ class tbg_converter
 
 		// All of the possible characters we will allow.
 		$chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*_=+.,?/[]{}|';
-		$chars_len = strlen($chars);
+		$chars_len = strlen($chars) - 1;
 
 		$random_string = '';
 
@@ -396,7 +442,7 @@ class tbg_converter
 		// @ !!! Will need to strip doStep from the function name and cast as a int for security.
 		$real_step = str_replace('doStep', '', $function);
 
-		if (!is_int($real_step) || (int) $real_step == 0)
+		if (!is_int($real_step) && (int) $real_step == 0)
 		{
 			debug_print_backtrace();
 			exit;
@@ -404,9 +450,9 @@ class tbg_converter
 
 		// If ajax, return some data.
 		$data = array(
-			'step' => $function,
+			'step' => $real_step,
 			'time' => time(),
-			'substep' => getSubStep($function),
+			'substep' => $this->substep,
 		);
 
 		if ($this->is_json)
@@ -439,7 +485,6 @@ class mbt_to_tbg extends tbg_converter
 	 */
 	public function setDatabasePrefix()
 	{
-		$this->setTBGDatabasePrefix();
 		$this->mbt_db_prefix = $this->mbt_db_name . '.' . $this->mbt_db_table_prefix;
 	}
 
@@ -455,6 +500,41 @@ class mbt_to_tbg extends tbg_converter
 		return $settings + array(
 			'mantis_loc' => array('name' => 'Mantis Location', 'type' => 'text', 'required' => true, 'validate' => 'return file_exists($data) && file_exists($data . \'/config_inc.php\');'),
 		);
+	}
+
+	/**
+	 * Establish a database connection
+	 */
+	function getDatabaseConnection()
+	{
+		global $g_database_name;
+
+		// First load TBG.
+		parent::getDatabaseConnection();
+
+		// Now lets load up Mantis stuff.
+		define('ON', true);
+		define('OFF', false);
+		define('PHPMAILER_METHOD_MAIL', 'mail');
+		define('DATABASE', 'mysql');
+		define('NOBODY', 'mantis');
+		require_once($this->mantis_loc . '/config_inc.php');
+
+		// Save the mantis info.
+		$this->mbt_db_name = $g_database_name;
+		$this->mbt_db_table_prefix = isset($g_db_table_prefix) ? $g_db_table_prefix . '_' : 'mantis_';
+
+		// Try to start a mantis connection.
+		try
+		{
+			$this->mantis_db = new PDO ($g_db_type . ':host=' . $g_hostname . ';dbname=' . $g_database_name, $g_db_username, $g_db_password);
+		}
+		catch (PDOException $e)
+		{
+			exit('Connection failed' . $e->getMessage());
+		}
+
+		$this->setDatabasePrefix();
 	}
 
 	/**
@@ -519,18 +599,19 @@ class mbt_to_tbg extends tbg_converter
 		$query = '
 			SELECT
 				id, username, username AS buddyname, realname, email, password,
-				enabled, last_vist AS lastseen, date_created AS joined
+				enabled, last_visit AS lastseen, date_created AS joined
 			FROM
 				' . $this->mbt_db_prefix . 'user_table
-			LIMIT ' . $substep . ' ' . $step_size;
+			LIMIT ' . $step_size . ' OFFSET ' . $substep;
 
 		// We could let this save up a few inserts then do them at once, but are we really worried about saving queries here?
 		$i = 0;
-		foreach ($this->db->query($query) as $row)
+
+		foreach ($this->mantis_db->query($query) as $row)
 		{
 			$password = $this->getRandomString();
 
-			$this->db->query('
+			$this->tbg_db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'users (id, username, buddyname, realname, email, password, enabled, lastseen, joined)
 				VALUES (' . $row['id'] . ', "' . $row['username'] . '", "' . $row['buddyname'] . '", "' . $row['realname'] . '", "' . $row['email'] . '", "' . $password . '", ' . $row['enabled'] . ', ' . $row['username'] . ', ' . $row['joined'] . ')');
 
@@ -554,12 +635,12 @@ class mbt_to_tbg extends tbg_converter
 				id, name, description,
 				(CASE WHEN enabled = 0 THEN 1 ELSE 0) AS locked
 				FROM ' . $this->mbt_db_prefix . 'project_table
-			LIMIT ' . $substep . ' ' . $step_size;
+			LIMIT ' . $step_size . ' OFFSET ' . $substep;
 
 		$i = 0;
-		foreach ($this->db->query($query) as $row)
+		foreach ($this->mantis_db->query($query) as $row)
 		{
-			$this->db->query('
+			$this->tbg_db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'projects (id, name, locked, description)
 				VALUES (' . $row['id'] . ', "' . $row['name'] . '", ' . $row['locked'] . ', "' . $row['description'] . '")');
 
@@ -582,12 +663,12 @@ class mbt_to_tbg extends tbg_converter
 			SELECT
 				name
 				FROM ' . $this->mbt_db_prefix . 'category_table
-			LIMIT ' . $substep . ' ' . $step_size;
+			LIMIT ' . $step_size . ' OFFSET ' . $substep;
 
 		$i = 0;
-		foreach ($this->db->query($query) as $row)
+		foreach ($this->mantis_db->query($query) as $row)
 		{
-			$this->db->query('
+			$this->tbg_db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'listtypes (name, itemtype, scope)
 				VALUES (' . $row['name'] . ', "category", 1)');
 
@@ -612,22 +693,22 @@ class mbt_to_tbg extends tbg_converter
 				id, name
 				FROM ' . $this->mbt_db_prefix . 'builds';
 		$builds = array();
-		foreach ($this->db->query($sql) as $row)
+		foreach ($this->tbg_db->query($sql) as $row)
 			$builds[$row['name']] = $row['id'];
 
 		$query = '
 			SELECT
 				id, project_id, version, released AS isreleased
 				FROM ' . $this->mbt_db_prefix . 'project_version_table
-			LIMIT ' . $substep . ' ' . $step_size;
+			LIMIT ' . $step_size . ' OFFSET ' . $substep;
 
 		$i = 0;
-		foreach ($this->db->query($query) as $row)
+		foreach ($this->mantis_db->query($query) as $row)
 		{
 			if (isset($builds[$version]))
 				continue;
 
-			$this->db->query('
+			$this->tbg_db->query('
 				INSERT INTO (' . $this->tbg_db_prefix . 'builds (name) VALUES (' . $row['version'] . ')');
 
 			$builds[$row['version']] = $this->db->lastInsertId();
@@ -654,7 +735,7 @@ class mbt_to_tbg extends tbg_converter
 				id, name
 				FROM ' . $this->mbt_db_prefix . 'builds';
 		$builds = array();
-		foreach ($this->db->query($query) as $row)
+		foreach ($this->tbg_db->query($query) as $row)
 			$builds[$row['name']] = $row['id'];
 
 		$query = '
@@ -673,19 +754,19 @@ class mbt_to_tbg extends tbg_converter
 					version
 				FROM ' . $this->mbt_db_prefix . 'bug_table AS bt
 					LEFT JOIN ' . $this->mbt_db_prefix . 'bug_text_table AS btt ON (btt.id = bt.bug_text_id)
-			LIMIT ' . $substep . ' ' . $step_size;
+			LIMIT ' . $step_size . ' OFFSET ' . $substep;
 
 		$i = 0;
-		foreach ($this->db->query($sql) as $row)
+		foreach ($this->mantis_db->query($sql) as $row)
 		{
-			$this->db->query('
+			$this->tbg_db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'issues (id, project_id, title, assigned_to, duplicate_of, posted, last_updated, state, category, resolution, priority, severity, reproducability)
 				VALUES (' . $row['id'] . ', ' . $row['project_id'] . ', "' . $row['title'] . '", ' . $row['assigned_to'] . ', ' . $row['duplicate_of'] . ', ' . $row['posted'] . ', ' . $row['last_updated'] . ', ' . $row['state'] . ', ' . $row['category'] . ', ' . $row['category'] . ', ' . $row['resolution'] . ', ' . $row['priority'] . ', ' . $row['severity'] . ', ' . $row['reproducability'] . ')
 			');
 
 			if (!isset($builds[$row['version']]))
 			{
-				$this->db->query('
+				$this->tbg_db->query('
 					INSERT INTO (' . $this->tbg_db_prefix . 'builds (name) VALUES (' . $row['version'] . ')');
 
 				$builds[$row['version']] = $this->db->lastInsertId();	
@@ -693,7 +774,7 @@ class mbt_to_tbg extends tbg_converter
 
 			$affect_id = $builds[$row['version']];
 
-			$this->db->query('
+			$this->tbg_db->query('
 				INSERT INTO (' . $this->tbg_db_prefix . 'issueaffectsbuild (id, build) VALUES(' . $row['id'] . ', ' . $affect_id . ')');
 
 			++$i;
@@ -717,12 +798,12 @@ class mbt_to_tbg extends tbg_converter
 				bn.reporter_id AS updated_by, bn.reporter_id AS posted_by, bnt.note AS content
 				FROM ' . $this->mbt_db_prefix . 'bugnote_table AS bn
 					INNER JOIN ' . $this->mbt_db_prefix . 'butnote_text_table AS bnt ON (bn.id = bnt.bug_text_id)
-			LIMIT ' . $substep . ' ' . $step_size;
+			LIMIT ' . $step_size . ' OFFSET ' . $substep;
 
 		$i = 0;
-		foreach ($this->db->query($query) as $row)
+		foreach ($this->mantis_db->query($query) as $row)
 		{
-			$this->db->query('
+			$this->tbg_db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'comments (id, target_id, updated, posted, updated_by, posted_by, content)
 				VALUES (' . $row['id'] . ', ' . $row['target_id'] . ', ' . $row['updated'] . ', ' . $row['posted'] . ', ' . $row['updated_by'] . ', ' . $row['posted_by'] . ', "' . $row['content'] . '")');
 
@@ -745,12 +826,12 @@ class mbt_to_tbg extends tbg_converter
 			SELECT
 				source_bug_id AS parent_id, destination_bug_id AS child_id
 				FROM ' . $this->mbt_db_prefix . 'bug_relationships_table
-			LIMIT ' . $substep . ' ' . $step_size;
+			LIMIT ' . $step_size . ' OFFSET ' . $substep;
 
 		$i = 0;
-		foreach ($this->db->query($query) as $row)
+		foreach ($this->mantis_db->query($query) as $row)
 		{
-			$this->db->query('
+			$this->tbg_db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'issuerelations (parent_id, child_id)
 				VALUES (' . $row['parent_id'] . ', ' . $row['child_id'] . ')');
 
@@ -781,12 +862,12 @@ class mbt_to_tbg extends tbg_converter
 				id, user_id AS uid, 1 AS scope, filename AS real_filename, filename AS original_filename,
 				file_type AS content_type, content, date_added AS uploaded_at, description
 				FROM ' . $this->mbt_db_prefix . 'bug_file_table
-			LIMIT ' . $substep . ' ' . $step_size;
+			LIMIT ' . $step_size . ' OFFSET ' . $substep;
 
 		$i = 0;
-		foreach ($this->db->query($query) as $row)
+		foreach ($this->mantis_db->query($query) as $row)
 		{
-			$this->db->query('
+			$this->tbg_db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'files (id, uid, scope, real_filename, original_filename, content_type, content, uploaded_at, description)
 				VALUES (' . $row['id'] . ', ' . $row['uid'] . ', ' . $row['scope'] . ', "' . $row['real_filename'] . '", "' . $row['original_filename'] . '", "' . $row['content_type'] . '", "' . $row['content'] . '", ' . $row['uploaded_at'] . ', "' . $row['description'] . '")');
 
@@ -1260,7 +1341,7 @@ class tbg_converter_wrapper
 			elseif ($data['type'] == 'password')
 				echo '<input type="password" name="', $key, '" />';
 			else
-				echo '<input type="text" name="', $key, '"', isset($data['default']) ? ' value="' . $data['default'] . '"' : (isset($_POST[$key]) ? $_POST[$key] : ''), ' />';
+				echo '<input type="text" name="', $key, '"', isset($_POST[$key]) ? ' value="' . $_POST[$key] . '"' : (isset($data['default']) ? $data['default'] : ''), ' />';
 
 			echo '</dd>';
 		}
