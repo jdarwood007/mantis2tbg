@@ -663,17 +663,17 @@ class mbt_to_tbg extends tbg_converter
 			// Add the default permissions.
 			$this->tbg_db->query('
 				INSERT INTO ' . $this->tbg_db_prefix . 'permissions (permission_type, target_id, allowed, module, uid, gid, tid, scope) VALUES
-					("canseeproject", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
-					("canseeprojecthierarchy", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
-					("canmanageproject", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
-					("page_project_allpages_access", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
-					("canvoteforissues", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
-					("canlockandeditlockedissues", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
-					("cancreateandeditissues", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
-					("caneditissue", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
-					("caneditissuecustomfields", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
-					("canaddextrainformationtoissues", " . $row["id"] . ", 1, "core", 1, 0, 0, 1),
-					("canpostseeandeditallcomments", " . $row["id"] . ", 1, "core", 1, 0, 0, 1)');
+					("canseeproject", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
+					("canseeprojecthierarchy", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
+					("canmanageproject", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
+					("page_project_allpages_access", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
+					("canvoteforissues", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
+					("canlockandeditlockedissues", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
+					("cancreateandeditissues", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
+					("caneditissue", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
+					("caneditissuecustomfields", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
+					("canaddextrainformationtoissues", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
+					("canpostseeandeditallcomments", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1)');
 
 			++$i;
 		}
