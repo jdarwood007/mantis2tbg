@@ -181,7 +181,7 @@ class tbg_converter
 
 			$this->checkTimeout($data[1], $this->substep, $data[2], $count);
 		}
-		while ($this->step < count($this->steps));
+		while ($this->step < count($this->steps) + 1);
 	}
 
 	/**
@@ -895,11 +895,12 @@ class mbt_to_tbg extends tbg_converter
 		$i = 0;
 		foreach ($this->mantis_db->query($query) as $row)
 		{
-			$this->tbg_db->query('
-				INSERT INTO ' . $this->tbg_db_prefix . 'files (id, uid, scope, real_filename, original_filename, content_type, content, uploaded_at, description)
-				VALUES (' . $row['id'] . ', ' . $row['uid'] . ', ' . $row['scope'] . ', "' . $row['real_filename'] . '", "' . $row['original_filename'] . '", "' . $row['content_type'] . '", "' . $row['content'] . '", ' . $row['uploaded_at'] . ', "' . $row['description'] . '")');
+			// First we have to clean this up.
+			$row['content'] = $this->tbg_db->quote($row['content']);
 
-exit(var_dump($this->tbg_db->errorInfo()));
+			$this->tbg_db->query('
+				REPLACE INTO ' . $this->tbg_db_prefix . 'files (id, uid, scope, real_filename, original_filename, content_type, content, uploaded_at, description)
+				VALUES (' . $row['id'] . ', ' . $row['uid'] . ', ' . $row['scope'] . ', "' . $row['real_filename'] . '", "' . $row['original_filename'] . '", "' . $row['content_type'] . '", "' . $row['content'] . '", ' . $row['uploaded_at'] . ', "' . $row['description'] . '")');
 
 			++$i;
 		}
