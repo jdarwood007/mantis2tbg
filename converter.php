@@ -24,8 +24,10 @@ ini_set('display_errors', 1);
 * Add ajax support
 * Test
 * The version needs split into major, minor and revision.. Fun.
+* Should move queries to be executed by a local method to handle errors.
 */
 
+// This is my debugging for debugging queries.
 // exit(var_dump($this->tbg_db->errorInfo()));
 /*
 * @TODO Known Bugs
@@ -847,8 +849,8 @@ class mbt_to_tbg extends tbg_converter
 		foreach ($this->mantis_db->query($query) as $row)
 		{
 			$this->tbg_db->query('
-				REPLACE INTO ' . $this->tbg_db_prefix . 'issues (id, issue_no, project_id, title, assigned_to, duplicate_of, posted, last_updated, state, issuetype, category, resolution, priority, severity, reproducability)
-				VALUES (' . $row['id'] . ', ' . $row['issue_no'] . ', ' . $row['project_id'] . ', "' . $row['title'] . '", ' . $row['assigned_to'] . ', ' . $row['duplicate_of'] . ', ' . $row['posted'] . ', ' . $row['last_updated'] . ', ' . $row['state'] . ', ' . $row['issuetype'] . ', ' . $row['category'] . ',  ' . $row['resolution'] . ', ' . $row['priority'] . ', ' . $row['severity'] . ', ' . $row['reproducability'] . ')
+				REPLACE INTO ' . $this->tbg_db_prefix . 'issues (id, issue_no, project_id, title, assigned_to, duplicate_of, posted, last_updated, state, issuetype, category, resolution, priority, severity, reproducability, scope)
+				VALUES (' . $row['id'] . ', ' . $row['issue_no'] . ', ' . $row['project_id'] . ', "' . $row['title'] . '", ' . $row['assigned_to'] . ', ' . $row['duplicate_of'] . ', ' . $row['posted'] . ', ' . $row['last_updated'] . ', ' . $row['state'] . ', ' . $row['issuetype'] . ', ' . $row['category'] . ',  ' . $row['resolution'] . ', ' . $row['priority'] . ', ' . $row['severity'] . ', ' . $row['reproducability'] . ', 1)
 			');
 
 			// This attempts to find any versions that got missed, but isn't accurate.
