@@ -98,6 +98,9 @@ class tbg_converter
 		// Open a new theme.
 		$theme = new tbg_converter_wrapper($this->steps, array($this->main_credits, $this->credits));
 
+		if ($this->is_cli);
+			ob_end_clean();
+
 		// We can't process anymore until this exists.
 		if (empty($this->db_user))
 			$this->converterSetup();
@@ -112,6 +115,8 @@ class tbg_converter
 	public function processCLI()
 	{
 		$this->is_cli = true;
+
+		print ("Checking Settings: ");
 
 		// First off, clean the buffers and buy us some time.
 		@ob_end_clean();
@@ -183,15 +188,22 @@ class tbg_converter
 		{
 			$data = $this->steps[$this->step];
 
-			$this->updateSubStep($this->substep);
-			$this->updateStep($data[1]);
+			// Update some step info.
 			$this->step_size = $data[2];
 
-			$count = $this->$data[1]();
+			// This actually runs the process.
+			$count = $this->$data[1]($this->step_size, $this->substep);
 
-			$this->checkTimeout($data[1], $this->substep, $data[2], $count);
+			// We are on the next step.
+			if ($count < $this->step_size)
+				$this->updateStep($data[1]);
+			else
+				// Update the current step.
+				$this->updateSubStep($this->substep + $this->step_size);			
+
+			$this->checkTimeout($data[1], $this->substep, $this->step_size, $count);
 		}
-		while ($this->step < count($this->steps) + 1);
+		while ($this->step < count($this->steps));
 	}
 
 	/**
@@ -392,6 +404,10 @@ class tbg_converter
 	{
 		$step = str_replace('doStep', '', $step) + 1;
 
+		// Don't do this if we changed nothing.
+		if ($step == $this->step)
+			return;
+
 		$_GET['step'] = (int) $step;
 
 		$this->step = (int) $step;
@@ -399,18 +415,22 @@ class tbg_converter
 		// Reset.
 		$this->updateSubStep(0);
 
-		return true;
-	}
+		// Let the CLI know.
+		if ($this->is_cli)
+		{
+			print ("Done!");
 
-	/**
-	*
-	* Gets the current substep
-	*
-	* @param string $step The current function we are on.
-	*/
-	function getSubStep($step)
-	{
-			return $this->substep;
+			// Hold on, We are done!
+			if ($this->step < count($this->steps))
+				print ("\nStep: " . $this->step . ") ". $this->steps[$this->step][0] . ' ');
+			else
+				exit ("\n\n");
+
+			return true;
+		}
+
+
+		return true;
 	}
 
 	/**
@@ -423,8 +443,6 @@ class tbg_converter
 	{
 		$_GET['substep'] = (int) $substep;
 		$this->substep = (int) $substep;
-
-		return true;
 	}
 
 	/**
@@ -437,8 +455,6 @@ class tbg_converter
 	{
 		global $theme;
 
-		$this->updateSubStep($substep + $max_step_size);
-
 		// Hold on, we had less results than we should have.
 		if ($max_step_size > $count)
 			$this->updateStep($function);
@@ -446,9 +462,8 @@ class tbg_converter
 		// CLI conversions can just continue.
 		if ($this->is_cli)
 		{
-			if (time() - $this->start_time > 1)
-				print (".\r");
-			$this->$function();
+			print (".");
+			return true;
 		}
 
 		// Try to buy us more time.
@@ -458,7 +473,7 @@ class tbg_converter
 
 		// if we can pass go, collect $200.
 		if (time() - $this->start_time < 10)
-			$this->$function();
+			return true;
 
 		// @ TODO: Add in timeout stuff here.
 		// @ !!! If this is all done via ajax, it should be a json or xml return.
@@ -496,9 +511,10 @@ class mbt_to_tbg extends tbg_converter
 	// What steps shall we take.
 	protected $steps = array(
 		// Key => array('Descriptive', 'functionName', (int) step_size),
+		0 => array('Checking Settings', false, -1),
 		1 => array('Users', 'doStep1', 500),
 		array('Projects', 'doStep2', 500),
-		array('Project Permissions', 'doStep3', 1),
+		array('Project Permissions', 'doStep3', 999),
 		array('Categories', 'doStep4', 500),
 		array('Versions', 'doStep5', 500),
 		array('Issues', 'doStep6', 500),
@@ -609,7 +625,7 @@ class mbt_to_tbg extends tbg_converter
 	* @Should it empty the tables prior to conversion or just dump over?
 	* @Should we do this in each step?
 	*/
-	function doStep0()
+	function doStep0($step_size, $substep)
 	{
 	}
 
@@ -617,11 +633,8 @@ class mbt_to_tbg extends tbg_converter
 	* Convert users.
 	*
 	*/
-	function doStep1()
+	function doStep1($step_size, $substep)
 	{
-		$step_size = 500;
-		$substep = $this->getSubStep(__FUNCTION__);
-
 		$query = '
 			SELECT
 				id, username, username AS buddyname, realname, email, password,
@@ -651,11 +664,8 @@ class mbt_to_tbg extends tbg_converter
 	* Convert Projects.
 	*
 	*/
-	function doStep2()
+	function doStep2($step_size, $substep)
 	{
-		$step_size = 500;
-		$substep = $this->getSubStep(__FUNCTION__);
-
 		$query = '
 			SELECT
 				id, name, description,
@@ -686,7 +696,7 @@ class mbt_to_tbg extends tbg_converter
 	* Add in default permissions.
 	*
 	*/
-	function doStep3()
+	function doStep3($step_size, $substep)
 	{
 		// Clean up the projects permissions index.
 		$query = '
@@ -731,18 +741,15 @@ class mbt_to_tbg extends tbg_converter
 				AND itemtype = "category"');
 
 		// We are done.
-		return 2;
+		return 1;
 	}
 
 	/**
 	* Convert Categories.
 	* WARNING: RUNNING THIS MULTIPLE TIMES MAY CAUSE DUPLICATE ENTRIES.
 	*/
-	function doStep4()
+	function doStep4($step_size, $substep)
 	{
-		$step_size = 500;
-		$substep = $this->getSubStep(__FUNCTION__);
-
 		$query = '
 			SELECT
 				name
@@ -770,11 +777,8 @@ class mbt_to_tbg extends tbg_converter
 	* Convert Versions.
 	*
 	*/
-	function doStep5()
+	function doStep5($step_size, $substep)
 	{
-		$step_size = 500;
-		$substep = $this->getSubStep(__FUNCTION__);
-
 		// Obtain any current builds.
 		$query = '
 			SELECT
@@ -812,11 +816,8 @@ class mbt_to_tbg extends tbg_converter
 	* Normally we want to fix them, but in this case we want to convert bugs.
 	*
 	*/
-	function doStep6()
+	function doStep6($step_size, $substep)
 	{
-		$step_size = 500;
-		$substep = $this->getSubStep(__FUNCTION__);
-
 		// Obtain any current builds.
 		$query = '
 			SELECT
@@ -882,11 +883,8 @@ class mbt_to_tbg extends tbg_converter
 	* Bug Notes.
 	*
 	*/
-	function doStep7()
+	function doStep7($step_size, $substep)
 	{
-		$step_size = 500;
-		$substep = $this->getSubStep(__FUNCTION__);
-
 		$query = '
 			SELECT
 				bn.id, bn.bug_id AS target_id, bn.last_modified AS updated, bn.date_submitted AS posted,
@@ -895,16 +893,9 @@ class mbt_to_tbg extends tbg_converter
 					INNER JOIN ' . $this->mbt_db_prefix . 'bugnote_text_table AS bnt ON (bn.bugnote_text_id = bnt.id)
 			LIMIT ' . $step_size . ' OFFSET ' . $substep;
 
-// The converter doesn't seem to go past 1k comments. WHY!
-var_dump($substep); echo "\n";
-
 		$i = 0;
 		foreach ($this->mantis_db->query($query) as $row)
 		{
-// A random comment we are looking for.  Just contains "*bump*".
-if ($row['id'] == 2433)
-	var_dump($row);
-
 			$row['content'] = $this->tbg_db->quote($row['content']);
 
 
@@ -912,11 +903,6 @@ if ($row['id'] == 2433)
 				REPLACE INTO ' . $this->tbg_db_prefix . 'comments (id, target_id, target_type, content, posted, updated, updated_by, posted_by)
 				VALUES (' . $row['id'] . ', ' . $row['target_id'] . ', 1, "' . $row['content'] . '", ' . $row['posted'] . ', ' . $row['updated'] . ', ' . $row['updated_by'] . ', ' . $row['posted_by'] . ')');
 			++$i;
-
-// Only trying to error if we got one.
-if ($this->tbg_db->errorCode() != '00000')
-	exit(var_dump($this->tbg_db->errorInfo()));
-
 		}
 
 		return $i;
@@ -926,14 +912,8 @@ if ($this->tbg_db->errorCode() != '00000')
 	* Relationships are great.
 	*
 	*/
-	function doStep8()
+	function doStep8($step_size, $substep)
 	{
-// @ TODO REMOVE :P
-exit('got done');
-
-		$step_size = 500;
-		$substep = $this->getSubStep(__FUNCTION__);
-
 		$query = '
 			SELECT
 				source_bug_id AS parent_id, destination_bug_id AS child_id
@@ -957,11 +937,8 @@ exit('got done');
 	* Attachments, the pain of our every existence)
 	*
 	*/
-	function doStep9()
+	function doStep9($step_size, $substep)
 	{
-		$step_size = 100;
-		$substep = $this->getSubStep(__FUNCTION__);
-
 		// @TODO: GET THE ATTACHMENT LOCATION
 		/*
 		// TGB appears to allow storage of files in the database.  The source code appears to work it out properly whether it is in the database or local storage.
