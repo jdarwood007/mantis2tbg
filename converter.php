@@ -35,7 +35,7 @@ exit(var_dump($this->tbg_db->errorInfo()));
 
 /*
 * @TODO Known Bugs
-* Converting categories doesn't sort them properly for which category they existed.
+* Converting categories doesn't sort them properly for which project they existed.
 * Converting versions doesn't work when repeated due to the data existing in builds already and is skipped.  Step 0 anyone?
 * Doesn't add the default wiki pages upon creating a project.
 * Issue conversion doesn't fix state.
@@ -462,7 +462,7 @@ class tbg_converter
 		// CLI conversions can just continue.
 		if ($this->is_cli)
 		{
-			print (".");
+			print(".");
 			return true;
 		}
 
