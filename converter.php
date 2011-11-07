@@ -489,12 +489,13 @@ class mbt_to_tbg extends tbg_converter
 		// Key => array('Descriptive', 'functionName', (int) step_size),
 		1 => array('Users', 'doStep1', 500),
 		array('Projects', 'doStep2', 500),
-		array('Categories', 'doStep3', 500),
-		array('Versions', 'doStep4', 500),
-		array('Issues', 'doStep5', 500),
-		array('Comments', 'doStep6', 500),
-		array('Relationships', 'doStep7', 500),
-		array('Attachments', 'doStep8', 100),
+		array('Project Permissions', 'doStep3', 1),
+		array('Categories', 'doStep4', 500),
+		array('Versions', 'doStep5', 500),
+		array('Issues', 'doStep6', 500),
+		array('Comments', 'doStep7', 500),
+		array('Relationships', 'doStep8', 500),
+		array('Attachments', 'doStep9', 100),
 	);
 	/**
 	 * Set the prefix that will be used prior to every reference of a table
@@ -656,24 +657,15 @@ class mbt_to_tbg extends tbg_converter
 		$i = 0;
 		foreach ($this->mantis_db->query($query) as $row)
 		{
-			$this->tbg_db->query('
-				REPLACE INTO ' . $this->tbg_db_prefix . 'projects (id, name, locked, description, scope, workflow_scheme_id, issuetype_scheme_id)
-				VALUES (' . $row['id'] . ', "' . $row['name'] . '", ' . $row['locked'] . ', "' . $row['description'] . '", 1, 1, 1)');
+			$key = strtr($row['name'], array(
+				' - ' => '-',
+				' ' => '_',
+			));
 
-			// Add the default permissions.
-			$this->tbg_db->query('
-				REPLACE INTO ' . $this->tbg_db_prefix . 'permissions (permission_type, target_id, allowed, module, uid, gid, tid, scope) VALUES
-					("canseeproject", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
-					("canseeprojecthierarchy", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
-					("canmanageproject", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
-					("page_project_allpages_access", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
-					("canvoteforissues", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
-					("canlockandeditlockedissues", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
-					("cancreateandeditissues", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
-					("caneditissue", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
-					("caneditissuecustomfields", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
-					("canaddextrainformationtoissues", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1),
-					("canpostseeandeditallcomments", ' . $row['id'] . ', 1, "core", 1, 0, 0, 1)');
+				// We have to use ` on key otherwise mysql errors.
+				$this->tbg_db->query('
+				REPLACE INTO ' . $this->tbg_db_prefix . 'projects (id, name, `key`, locked, description, scope, workflow_scheme_id, issuetype_scheme_id)
+				VALUES (' . $row['id'] . ', "' . $row['name'] . '", "' . $key . '", ' . $row['locked'] . ', "' . $row['description'] . '", 1, 1, 1)');
 
 			++$i;
 		}
@@ -682,18 +674,63 @@ class mbt_to_tbg extends tbg_converter
 	}
 
 	/**
-	* Convert Categories.
-	* WARNING: RUNNING THIS MULTIPLE TIMES MAY CAUSE DUPLICATE ENTRIES.
+	* Add in default permissions.
+	*
 	*/
 	function doStep3()
 	{
-		// This attempts to remove extras added by repeated conversions.
+		// Clean up the projects permissions index.
+		$query = '
+			SELECT id
+			FROM ' . $this->tbg_db_prefix . 'projects';
+
+		$projects = array();
+		foreach ($this->tbg_db->query($query) as $row)
+			$projects[] = $row['id'];
+
+		$this->tbg_db->query('
+				DELETE FROM ' . $this->tbg_db_prefix . 'permissions
+				WHERE target_id IN (' . implode(',', $projects) . ')');
+
+		// Lets avoid a trillionth id number.
+		$this->tbg_db->query('
+				ALTER TABLE ' . $this->tbg_db_prefix . 'permissions
+					AUTO_INCERMENT=1');
+
+		// We still have this handy!
+		foreach ($projects as $project_id)
+		{
+			$this->tbg_db->query('
+				INSERT INTO ' . $this->tbg_db_prefix . 'permissions (permission_type, target_id, allowed, module, uid, gid, tid, scope) VALUES
+					("canseeproject", ' . $project_id . ', 1, "core", 1, 0, 0, 1),
+					("canseeprojecthierarchy", ' . $project_id . ', 1, "core", 1, 0, 0, 1),
+					("canmanageproject", ' . $project_id . ', 1, "core", 1, 0, 0, 1),
+					("page_project_allpages_access", ' . $project_id . ', 1, "core", 1, 0, 0, 1),
+					("canvoteforissues", ' . $project_id . ', 1, "core", 1, 0, 0, 1),
+					("canlockandeditlockedissues", ' . $project_id . ', 1, "core", 1, 0, 0, 1),
+					("cancreateandeditissues", ' . $project_id . ', 1, "core", 1, 0, 0, 1),
+					("caneditissue", ' . $project_id . ', 1, "core", 1, 0, 0, 1),
+					("caneditissuecustomfields", ' . $project_id . ', 1, "core", 1, 0, 0, 1),
+					("canaddextrainformationtoissues", ' . $project_id . ', 1, "core", 1, 0, 0, 1),
+					("canpostseeandeditallcomments", ' . $project_id . ', 1, "core", 1, 0, 0, 1)');
+		}
+
+		// We do this quickly to prevent issues with the next step.
 		$this->tbg_db->query('
 			DELETE FROM ' . $this->tbg_db_prefix . 'listtypes
 			WHERE id NOT IN (1,2,3)
 				AND itemtype = "category"');
 
+		// We are done.
+		return 2;
+	}
 
+	/**
+	* Convert Categories.
+	* WARNING: RUNNING THIS MULTIPLE TIMES MAY CAUSE DUPLICATE ENTRIES.
+	*/
+	function doStep4()
+	{
 		$step_size = 500;
 		$substep = $this->getSubStep(__FUNCTION__);
 
@@ -724,7 +761,7 @@ class mbt_to_tbg extends tbg_converter
 	* Convert Versions.
 	*
 	*/
-	function doStep4()
+	function doStep5()
 	{
 		$step_size = 500;
 		$substep = $this->getSubStep(__FUNCTION__);
@@ -766,7 +803,7 @@ class mbt_to_tbg extends tbg_converter
 	* Normally we want to fix them, but in this case we want to convert bugs.
 	*
 	*/
-	function doStep5()
+	function doStep6()
 	{
 		$step_size = 500;
 		$substep = $this->getSubStep(__FUNCTION__);
@@ -834,7 +871,7 @@ class mbt_to_tbg extends tbg_converter
 	* Bug Notes.
 	*
 	*/
-	function doStep6()
+	function doStep7()
 	{
 		$step_size = 500;
 		$substep = $this->getSubStep(__FUNCTION__);
@@ -864,7 +901,7 @@ class mbt_to_tbg extends tbg_converter
 	* Relationships are great.
 	*
 	*/
-	function doStep7()
+	function doStep8()
 	{
 		$step_size = 500;
 		$substep = $this->getSubStep(__FUNCTION__);
@@ -892,7 +929,7 @@ class mbt_to_tbg extends tbg_converter
 	* Attachments, the pain of our every existence)
 	*
 	*/
-	function doStep8()
+	function doStep9()
 	{
 		$step_size = 100;
 		$substep = $this->getSubStep(__FUNCTION__);
