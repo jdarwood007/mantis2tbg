@@ -32,6 +32,9 @@ ini_set('display_errors', 1);
 * Converting categories doesn't sort them properly for which category they existed.
 * Converting versions doesn't work when repeated due to the data existing in builds already and is skipped.  Step 0 anyone?
 * Doesn't add the default wiki pages upon creating a project.
+* Issue conversion doesn't fix state.
+* Issue conversion doesn't fix issuetype.
+* Issue conversion doesn't fix severity.
 */
 
 class tbg_converter
@@ -819,9 +822,10 @@ class mbt_to_tbg extends tbg_converter
 
 		$query = '
 			SELECT
-				bt.id, bt.project_id, bt.summary AS title, bt.handler_id AS assigned_to, bt.duplicate_id AS duplicate_of,
+				bt.id, bt.id AS issue_no, bt.project_id, bt.summary AS title, bt.handler_id AS assigned_to, bt.duplicate_id AS duplicate_of,
 				bt.date_submitted AS posted, bt.last_updated,
 				0 AS state /* NEEDS FIXED */,
+				1 AS issuetype /* NEEDS FIXED */,
 				
 				bt.category_id AS category, bt.resolution,
 				bt.priority,
@@ -843,8 +847,8 @@ class mbt_to_tbg extends tbg_converter
 		foreach ($this->mantis_db->query($query) as $row)
 		{
 			$this->tbg_db->query('
-				REPLACE INTO ' . $this->tbg_db_prefix . 'issues (id, project_id, title, assigned_to, duplicate_of, posted, last_updated, state, category, resolution, priority, severity, reproducability)
-				VALUES (' . $row['id'] . ', ' . $row['project_id'] . ', "' . $row['title'] . '", ' . $row['assigned_to'] . ', ' . $row['duplicate_of'] . ', ' . $row['posted'] . ', ' . $row['last_updated'] . ', ' . $row['state'] . ', ' . $row['category'] . ',  ' . $row['resolution'] . ', ' . $row['priority'] . ', ' . $row['severity'] . ', ' . $row['reproducability'] . ')
+				REPLACE INTO ' . $this->tbg_db_prefix . 'issues (id, issue_no, project_id, title, assigned_to, duplicate_of, posted, last_updated, state, issuetype, category, resolution, priority, severity, reproducability)
+				VALUES (' . $row['id'] . ', ' . $row['issue_no'] . ', ' . $row['project_id'] . ', "' . $row['title'] . '", ' . $row['assigned_to'] . ', ' . $row['duplicate_of'] . ', ' . $row['posted'] . ', ' . $row['last_updated'] . ', ' . $row['state'] . ', ' . $row['issuetype'] . ', ' . $row['category'] . ',  ' . $row['resolution'] . ', ' . $row['priority'] . ', ' . $row['severity'] . ', ' . $row['reproducability'] . ')
 			');
 
 			// This attempts to find any versions that got missed, but isn't accurate.
