@@ -28,6 +28,8 @@ ini_set('display_errors', 1);
 */
 
 /* This is my debugging for debugging queries.
+# php converter.php --tbg_loc=/home/dev/thebuggenie-3.1.4/core --tbg_db_pass=test --mantis_loc=/home/dev/mantisbt-1.2.8/
+
 exit(var_dump($this->tbg_db->errorInfo()));
 */
 
@@ -890,17 +892,31 @@ class mbt_to_tbg extends tbg_converter
 				bn.id, bn.bug_id AS target_id, bn.last_modified AS updated, bn.date_submitted AS posted,
 				bn.reporter_id AS updated_by, bn.reporter_id AS posted_by, bnt.note AS content
 				FROM ' . $this->mbt_db_prefix . 'bugnote_table AS bn
-					INNER JOIN ' . $this->mbt_db_prefix . 'bugnote_text_table AS bnt ON (bn.id = bnt.id)
+					INNER JOIN ' . $this->mbt_db_prefix . 'bugnote_text_table AS bnt ON (bn.bugnote_text_id = bnt.id)
 			LIMIT ' . $step_size . ' OFFSET ' . $substep;
+
+// The converter doesn't seem to go past 1k comments. WHY!
+var_dump($substep); echo "\n";
 
 		$i = 0;
 		foreach ($this->mantis_db->query($query) as $row)
 		{
+// A random comment we are looking for.  Just contains "*bump*".
+if ($row['id'] == 2433)
+	var_dump($row);
+
+			$row['content'] = $this->tbg_db->quote($row['content']);
+
+
 			$this->tbg_db->query('
 				REPLACE INTO ' . $this->tbg_db_prefix . 'comments (id, target_id, target_type, content, posted, updated, updated_by, posted_by)
 				VALUES (' . $row['id'] . ', ' . $row['target_id'] . ', 1, "' . $row['content'] . '", ' . $row['posted'] . ', ' . $row['updated'] . ', ' . $row['updated_by'] . ', ' . $row['posted_by'] . ')');
-
 			++$i;
+
+// Only trying to error if we got one.
+if ($this->tbg_db->errorCode() != '00000')
+	exit(var_dump($this->tbg_db->errorInfo()));
+
 		}
 
 		return $i;
@@ -912,6 +928,9 @@ class mbt_to_tbg extends tbg_converter
 	*/
 	function doStep8()
 	{
+// @ TODO REMOVE :P
+exit('got done');
+
 		$step_size = 500;
 		$substep = $this->getSubStep(__FUNCTION__);
 
