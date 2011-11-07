@@ -824,7 +824,7 @@ class mbt_to_tbg extends tbg_converter
 
 		$query = '
 			SELECT
-				bt.id, bt.id AS issue_no, bt.project_id, bt.summary AS title, bt.handler_id AS assigned_to, bt.duplicate_id AS duplicate_of,
+				bt.id, bt.id AS issue_no, bt.project_id, bt.summary AS title, bt.reporter_id AS posted_by, bt.handler_id AS assigned_to, bt.duplicate_id AS duplicate_of,
 				bt.date_submitted AS posted, bt.last_updated,
 				0 AS state /* NEEDS FIXED */,
 				1 AS issuetype /* NEEDS FIXED */,
@@ -849,8 +849,8 @@ class mbt_to_tbg extends tbg_converter
 		foreach ($this->mantis_db->query($query) as $row)
 		{
 			$this->tbg_db->query('
-				REPLACE INTO ' . $this->tbg_db_prefix . 'issues (id, issue_no, project_id, title, assigned_to, duplicate_of, posted, last_updated, state, issuetype, category, resolution, priority, severity, reproducability, scope)
-				VALUES (' . $row['id'] . ', ' . $row['issue_no'] . ', ' . $row['project_id'] . ', "' . $row['title'] . '", ' . $row['assigned_to'] . ', ' . $row['duplicate_of'] . ', ' . $row['posted'] . ', ' . $row['last_updated'] . ', ' . $row['state'] . ', ' . $row['issuetype'] . ', ' . $row['category'] . ',  ' . $row['resolution'] . ', ' . $row['priority'] . ', ' . $row['severity'] . ', ' . $row['reproducability'] . ', 1)
+				REPLACE INTO ' . $this->tbg_db_prefix . 'issues (id, issue_no, project_id, title, assigned_to, duplicate_of, posted, last_updated, state, issuetype, category, resolution, priority, severity, reproducability, workflow_step_id, scope)
+				VALUES (' . $row['id'] . ', ' . $row['issue_no'] . ', ' . $row['project_id'] . ', "' . $row['title'] . '", ' . $row['posted_by'] . ', ' . $row['assigned_to'] . ', ' . $row['duplicate_of'] . ', ' . $row['posted'] . ', ' . $row['last_updated'] . ', ' . $row['state'] . ', ' . $row['issuetype'] . ', ' . $row['category'] . ',  ' . $row['resolution'] . ', ' . $row['priority'] . ', ' . $row['severity'] . ', ' . $row['reproducability'] . ', 1, 1)
 			');
 
 			// This attempts to find any versions that got missed, but isn't accurate.
