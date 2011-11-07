@@ -27,8 +27,10 @@ ini_set('display_errors', 1);
 * Should move queries to be executed by a local method to handle errors.
 */
 
-// This is my debugging for debugging queries.
-// exit(var_dump($this->tbg_db->errorInfo()));
+/* This is my debugging for debugging queries.
+exit(var_dump($this->tbg_db->errorInfo()));
+*/
+
 /*
 * @TODO Known Bugs
 * Converting categories doesn't sort them properly for which category they existed.
@@ -838,8 +840,8 @@ class mbt_to_tbg extends tbg_converter
 					WHEN bt.reproducibility > 70 AND bt.reproducibility < 90 THEN 9
 					ELSE 0
 				END) AS reproducability,
-				IFNULL(btt.steps_to_reproduce, "") AS reproduction_steps,
-				IFNULL(btt.description, "") AS description,
+				btt.steps_to_reproduce AS reproduction_steps,
+				btt.description AS description,
 				version
 				FROM ' . $this->mbt_db_prefix . 'bug_table AS bt
 					LEFT JOIN ' . $this->mbt_db_prefix . 'bug_text_table AS btt ON (btt.id = bt.bug_text_id)
@@ -849,9 +851,10 @@ class mbt_to_tbg extends tbg_converter
 		foreach ($this->mantis_db->query($query) as $row)
 		{
 			$this->tbg_db->query('
-				REPLACE INTO ' . $this->tbg_db_prefix . 'issues (id, issue_no, project_id, title, posted_by, assigned_to, duplicate_of, posted, last_updated, state, issuetype, category, resolution, priority, severity, reproducability, workflow_step_id, scope)
-				VALUES (' . $row['id'] . ', ' . $row['issue_no'] . ', ' . $row['project_id'] . ', "' . $row['title'] . '", ' . $row['posted_by'] . ', ' . $row['assigned_to'] . ', ' . $row['duplicate_of'] . ', ' . $row['posted'] . ', ' . $row['last_updated'] . ', ' . $row['state'] . ', ' . $row['issuetype'] . ', ' . $row['category'] . ',  ' . $row['resolution'] . ', ' . $row['priority'] . ', ' . $row['severity'] . ', ' . $row['reproducability'] . ', 1, 1)
-			');
+				REPLACE INTO ' . $this->tbg_db_prefix . 'issues (
+					id, issue_no, title, posted, last_updated, project_id, description, state, posted_by, assigned_to, reproduction_steps, resolution, issuetype, priority, category, severity, reproducability, duplicate_of, workflow_step_id, scope)
+				VALUES (
+					' . $row['id'] . ', ' . $row['issue_no'] . ', "' . $row['title'] . '", ' . $row['posted'] . ', ' . $row['last_updated'] . ', ' . $row['project_id'] . ', "' . $row['description'] . '", ' . $row['state'] . ', ' . $row['posted_by'] . ', ' . $row['assigned_to'] . ', "' . $row['reproduction_steps'] . '", ' . $row['resolution'] . ', ' . $row['issuetype'] . ', ' . $row['priority'] . ', ' . $row['category'] . ', ' . $row['severity'] . ', ' . $row['reproducability'] . ', ' . $row['duplicate_of'] . ', 1, 1)');
 
 			// This attempts to find any versions that got missed, but isn't accurate.
 			if (!isset($builds[$row['version']]))
@@ -894,8 +897,8 @@ class mbt_to_tbg extends tbg_converter
 		foreach ($this->mantis_db->query($query) as $row)
 		{
 			$this->tbg_db->query('
-				REPLACE INTO ' . $this->tbg_db_prefix . 'comments (id, target_id, updated, posted, updated_by, posted_by, content)
-				VALUES (' . $row['id'] . ', ' . $row['target_id'] . ', ' . $row['updated'] . ', ' . $row['posted'] . ', ' . $row['updated_by'] . ', ' . $row['posted_by'] . ', "' . $row['content'] . '")');
+				REPLACE INTO ' . $this->tbg_db_prefix . 'comments (id, target_id, target_type, content, posted, updated, updated_by, posted_by)
+				VALUES (' . $row['id'] . ', ' . $row['target_id'] . ', 1, "' . $row['content'] . '", ' . $row['posted'] . ', ' . $row['updated'] . ', ' . $row['updated_by'] . ', ' . $row['posted_by'] . ')');
 
 			++$i;
 		}
