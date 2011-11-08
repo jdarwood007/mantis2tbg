@@ -529,6 +529,7 @@ class mbt_to_tbg extends tbg_converter
 		array('Comments', 'doStep7', 500),
 		array('Relationships', 'doStep8', 500),
 		array('Attachments', 'doStep9', 100),
+		array('Create Guest', 'doStep10', 999),
 	);
 	/**
 	 * Set the prefix that will be used prior to every reference of a table
@@ -975,6 +976,53 @@ class mbt_to_tbg extends tbg_converter
 		}
 
 		return $i;
+	}
+
+	/**
+	* Recreate the guest user.
+	*
+	*/
+	function doStep10($step_size, $substep)
+	{
+		// First figure out what the guest id is.
+		$setting = $this->tbg_db->query('
+			SELECT value
+			FROM ' . $this->tbg_db_prefix . 'settings
+			WHERE name = "defaultuserid"
+				AND scope = 1
+				AND uid = 0
+				AND module = "core"');
+		$setting = $setting->fetch(PDO::FETCH_ASSOC);
+		$guest_id = $setting['value'];
+
+		// Lets verify if this matches.
+		$user = $this->tbg_db->query('
+			SELECT username, buddyname, realname, group_id, scope
+			FROM ' . $this->tbg_db_prefix . 'users
+			WHERE id = ' . $guest_id);
+		$user = $user->fetch(PDO::FETCH_ASSOC);
+
+		// Do not continue if this matches!
+		if ($user['username'] == 'guest' && $user['buddyname'] = 'Guest user' && $user['realname'] = 'Guest user' && $user['group_id'] == '3' && $user['scope'] == '1')
+			return 1;
+
+
+
+		// Alright, lets insert.
+		$this->tbg_db->query('
+			INSERT INTO tbg_users (username, password, buddyname, realname, email, userstate, customstate, homepage, language, lastseen, quota, activated, enabled, deleted, avatar, use_gravatar, private_email, openid_locked, joined, group_id, scope) VALUES
+			("guest", "$2a$07$7aed297690838a118c449uI/0rZ/C9RtAufoZzUv/zTHGaseWCM0e", "Guest user", "Guest user", "", NULL, 0, "", "", 0, NULL, 1, 1, 0, NULL, 1, 1, 0, 0, 3, 1)');
+
+		$new_guest_id = $this->tbg_db->lastInsertId();
+
+		// Update the settings table.
+		$this->tbg_db->query('
+			UPDATE ' . $this->tbg_db_prefix . 'settings
+			SET value = ' . $new_guest_id . '
+			WHERE name = "defaultuserid"
+				AND scope = 1
+				AND uid = 0
+				AND module = "core"');
 	}
 
 	// @ TODO: Duplicate function, merge or remove.
