@@ -334,9 +334,11 @@ class tbg_converter
 
 	/**
 	 * Set the prefix that will be used prior to every reference of a table
+	 * @param string $prefix = The database prefix.
 	 */
-	public function setTablePrefix()
+	public function setTablePrefix($prefix)
 	{
+		$this->tbg_db_table_prefix = $prefix;
 		$this->tbg_db_prefix = $this->tbg_db_name . '.' . $this->tbg_db_table_prefix;
 
 		return true;
@@ -372,9 +374,6 @@ class tbg_converter
 			echo $this->db_dsn;
 			exit('TBG Connection failed: ' . $e->getMessage() . "\n");
 		}
-
-		// Set the prefixes.
-		$this->setTablePrefix();
 
 		return true;
 	}
