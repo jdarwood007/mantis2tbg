@@ -22,6 +22,8 @@ ini_set('display_errors', 1);
 * @TODO The developers list of things todo.	
 * Add js to support ajax
 * Add ajax support
+* Add timeout checks
+* Provide a way to support percent complete checks (doStep#($check = false)?)
 * Test
 * The version needs split into major, minor and revision.. Fun.
 * Should move queries to be executed by a local method to handle errors.
@@ -504,6 +506,7 @@ class tbg_converter
 		if ($this->is_json)
 			$theme->return_json($data);
 		$theme->updateData($data);
+
 	}
 }
 
@@ -1005,8 +1008,6 @@ class mbt_to_tbg extends tbg_converter
 		// Do not continue if this matches!
 		if ($user['username'] == 'guest' && $user['buddyname'] = 'Guest user' && $user['realname'] = 'Guest user' && $user['group_id'] == '3' && $user['scope'] == '1')
 			return 1;
-
-
 
 		// Alright, lets insert.
 		$this->tbg_db->query('
@@ -1530,6 +1531,8 @@ class tbg_converter_wrapper
 
 			if ($id_step < $this->step)
 				echo 'completed';
+			elseif ($id_step == $this->step)
+				echo 'Last refresh:', $this->time;
 
 			echo '</span></li>';
 		}
